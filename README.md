@@ -56,16 +56,36 @@ and contacts only TMDB, unless you turn on skip intro.
 
 ## Installation
 
-Point IINA at this repository: **Preferences → Plugins → Install from GitHub...**, then enter your
-repository name. IINA's plugin manager handles updates from the releases page.
+### Local development (symlink)
 
-To try it without publishing, build a local package from this directory:
+IINA can load a local folder directly as long as it's symlinked into the plugin
+directory with an `.iinaplugin-dev` suffix. IINA 1.4+ ships a CLI for this at
+`IINA.app/Contents/MacOS/iina-plugin`:
 
 ```sh
-npx @iina/pluginpack build   # produces a .iinaplgz
+ln -s /Applications/IINA.app/Contents/MacOS/iina-plugin /usr/local/bin/iina-plugin
+iina-plugin link /path/to/this/repo      # create the symlink
+iina-plugin unlink /path/to/this/repo    # remove it
 ```
 
-Then double-click the `.iinaplgz`. Note that a locally built plugin will not auto-update.
+Edit the files, restart IINA, done — no repacking. **This is the way to run it
+while developing**, and it will not auto-update.
+
+### Distributed (GitHub, gets auto-updates)
+
+Push this repository to GitHub, cut a release, then in IINA:
+**Preferences → Plugins → Install from GitHub...** and enter `owner/repo`.
+IINA's plugin manager then handles updates. This is the only install route that
+auto-updates.
+
+### One-off install from a local folder
+
+```sh
+iina-plugin pack /path/to/this/repo     # produces a .iinaplgz
+```
+
+Then double-click the `.iinaplgz`. Useful for moving the plugin to another Mac
+without publishing, but it won't self-update.
 
 ## Setup
 
