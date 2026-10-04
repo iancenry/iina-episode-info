@@ -1086,6 +1086,11 @@ iina.onMessage("fileChanged", function(d){
     } else if (now && now.isMovie && !saved.isMovie) {
       stale = true;   // an episode identification on a film
     }
+    // An entry with no logoUrl key at all was saved before title treatments
+    // existed, so it would restore as plain text forever. Re-identify once:
+    // the refreshed entry always has the key, empty or not, and a title with
+    // genuinely no logo refreshes only this one time.
+    if (saved.logoUrl === undefined) stale = true;
   }
 
   if (saved && !stale) {

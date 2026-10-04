@@ -265,10 +265,11 @@ iina.onMessage("showData", function(d) {
   if (d.logoUrl) {
     logoEl.innerHTML = '<img src="' + esc(d.logoUrl) + '" alt="" />';
     logoEl.style.display = "block";
-    // A film's own title is the wordmark, so the placeholder "MOVIE" header
-    // and the now-redundant text title both step aside.
+    // The wordmark IS the title, so the text line it replaces steps aside —
+    // otherwise the card prints the show name twice. For a film that is the
+    // big title as well as the placeholder "MOVIE" header.
+    nameEl.style.display = "none";
     if (d.isMovie) {
-      nameEl.style.display = "none";
       titleEl.style.display = "none";
       wrapEl.setAttribute("data-logo", "movie");
     }
