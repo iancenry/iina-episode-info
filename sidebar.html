@@ -356,11 +356,14 @@ var JUNK_WORDS = [
   "10bit", "8bit", "hdr", "hdr10", "dv", "sdr", "hlg", "hdr10plus",
   "repack", "proper", "internal", "limited", "extended", "uncut",
   "retail", "remastered", "imax", "complete", "season", "series",
+  // Channel-count and subtitle-kind tags used by Asian scene releases.
+  "ch", "6ch", "2ch", "8ch", "5ch", "jpsc", "big5", "gb", "big5",
+  "softsub", "hardsub", "softsubs", "hardsubs", "subbed", "dubbed",
   // Language / audio tags. Only trimmed from the END of a title — words
   // like "German" or "Dark" can legitimately be part of a real title.
   "german", "english", "french", "spanish", "italian", "japanese", "korean",
   "nordic", "swedish", "danish", "dutch", "polish", "russian", "turkish",
-  "portuguese", "subs", "dubbed", "multi", "dual"
+  "portuguese", "subs", "multi", "dual"
 ];
 
 var JUNK_RE = new RegExp(
@@ -487,6 +490,27 @@ function autoCancelTimer() {
   if (autoTimerId !== null) { clearTimeout(autoTimerId); autoTimerId = null; }
 }
 
+// Release-group names are effectively unbounded ("BlueMovie", "NTb", "Raws",
+// …), so enumerating them can't work. Instead we hand TMDB a series of
+// progressively shorter prefixes of the parsed title and stop at the first
+// one that returns anything: full title, then dropping one trailing word at a
+// time down to the first word. For "Pantheon - 6CH SoftSub BlueMovie" that
+// walks all the way down to "Pantheon".
+function titleCandidates(title) {
+  var words = String(title).split(/\s+/).filter(Boolean);
+  var out = [];
+  function push(s) {
+    s = s.replace(/^[\s\-–—:.]+|[\s\-–—:.]+$/g, "").trim();
+    if (s.length >= 2 && out.indexOf(s) === -1) out.push(s);
+  }
+  for (var i = words.length; i >= 1; i--) push(words.slice(0, i).join(" "));
+  // Never fall back to a bare article — TMDB would happily return every show
+  // starting with "The" and we'd pick one at random.
+  return out.filter(function(s) {
+    return !/^(the|a|an|of|and|to|in|on)$/i.test(s);
+  });
+}
+
 // Identify the file that just opened, without the user touching anything.
 function autoIdentify(url) {
   var parsed = parseFilename(url);
@@ -500,39 +524,55 @@ function autoIdentify(url) {
   panel.innerHTML = '<div class="msg"><span class="sp"></span>Matching '
     + htmlEsc(parsed.fileName) + '…</div>';
 
+  var candidates = titleCandidates(parsed.title);
+  var deadline = autoTimerId;
+
+  // Try each candidate in turn; the first with results wins.
+  function attempt(i) {
+    if (i >= candidates.length) {
+      delete autoInFlight[url];
+      if (currentVideoUrl !== url) return;
+      if (autoTimerId === null) return;
+      autoCancelTimer();
+      panel.innerHTML = '<div class="msg">No match for '
+        + htmlEsc(parsed.fileName) + ' — search above.</div>';
+      return;
+    }
+    var q = encodeURIComponent(candidates[i]);
+    fetch("https://api.themoviedb.org/3/search/tv?api_key=" + TK + "&query=" + q)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        delete autoInFlight[url];
+        if (currentVideoUrl !== url || autoTimerId === null) return;
+        var list = (data.results || [])
+          .filter(function(x) { return x.media_type !== "movie" && x.name; });
+        if (!list.length) return attempt(i + 1);
+        autoCancelTimer();
+        // Highest-voted result is nearly always the right show.
+        list.sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
+        var pick = list[0];
+        document.getElementById("q").value = pick.name;
+        applyAutoMatch(pick, parsed.code);
+      })
+      .catch(function() {
+        delete autoInFlight[url];
+        if (currentVideoUrl !== url) return;
+        // A network failure will hit every candidate; don't hammer TMDB.
+        if (autoTimerId === null) return;
+        autoCancelTimer();
+        panel.innerHTML = '<div class="msg">Lookup failed — search above.</div>';
+      });
+  }
+
   autoTimerId = setTimeout(function() {
     autoTimerId = null;
     delete autoInFlight[url];
     if (currentVideoUrl !== url) return;
     panel.innerHTML = '<div class="msg">Couldn\'t match '
-      + htmlEsc(parsed.fileName) + ' automatically — search above.</div>';
+      + htmlEsc(parsed.fileName) + ' — search above.</div>';
   }, AUTO_SEARCH_MS);
 
-  var q = encodeURIComponent(parsed.title);
-  fetch("https://api.themoviedb.org/3/search/tv?api_key=" + TK + "&query=" + q)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      delete autoInFlight[url];
-      if (autoTimerId === null || currentVideoUrl !== url) return;
-      autoCancelTimer();
-      var list = (data.results || []).filter(function(x) { return x.media_type !== "movie"; });
-      if (!list.length) {
-        panel.innerHTML = '<div class="msg">No match for '
-          + htmlEsc(parsed.title) + ' — search above.</div>';
-        return;
-      }
-      // Highest-voted result is nearly always the right show.
-      list.sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
-      var pick = list[0];
-      document.getElementById("q").value = parsed.title;
-      applyAutoMatch(pick, parsed.code);
-    })
-    .catch(function() {
-      delete autoInFlight[url];
-      if (currentVideoUrl !== url) return;
-      autoCancelTimer();
-      panel.innerHTML = '<div class="msg">Lookup failed — search above.</div>';
-    });
+  attempt(0);
   return true;
 }
 
