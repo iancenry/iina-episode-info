@@ -340,7 +340,10 @@ var seasonPosterUrl = "";
 // filename, works out the show title and season/episode, then identifies the
 // file on its own. Anything it can't parse falls back to manual search.
 
-var AUTO_SEARCH_MS = 15000;   // give up on TMDB and show the panel
+// A miss costs a full round trip, and the ladder can need several before it
+// lands, so this has to cover more than one query.
+var AUTO_SEARCH_MS = 25000;   // give up on TMDB and show the panel
+var AUTO_MAX_TRIES = 6;       // bound the worst case
 var autoTimerId = null;
 // main.js re-emits fileChanged when the sidebar reports ready, so the same
 // URL can arrive twice. Track what's in flight so we only search once.
@@ -427,36 +430,43 @@ function parseEpisodeCode(base) {
 
 // Strip the episode code and everything that isn't the title.
 function cleanTitle(base, code) {
+  // Normalise separators FIRST. Scene names are mostly underscores, and a
+  // word-boundary anchor fails between "_" and "S" (both word characters), so
+  // "Band_of_Brothers_S01E04" would otherwise keep its episode code in the
+  // title. Converting to spaces up front makes every pattern below work on
+  // ordinary space-separated text.
   var t = base.replace(/\.[a-z0-9]{2,4}$/i, "");
+  t = t.replace(/[._]+/g, " ").replace(/\s+/g, " ").trim();
 
-  // Bracket groups first: they hold the noise ("[1080p]", "[SubsPlease]")
-  // and a trailing "]" would otherwise defeat the end-anchored patterns.
+  // Bracket groups usually hold the noise ("[1080p]", "[SubsPlease]").
   t = t.replace(/\[[^\]]*\]/g, " ").replace(/\([^)]*\)/g, " ");
   // Trailing "-GROUP" release tag.
   t = t.replace(/-\s*[A-Za-z0-9]+$/, "");
+  // CJK characters only ever appear in scene tags, never in a title we can
+  // search TMDB with.
+  t = t.replace(/[\u3000-\u9fff\uf900-\ufaff\uff00-\uffef]/g, " ");
 
   if (code) {
-    t = t.replace(/\bS\d{1,3}[\s._-]*E\d{1,3}(?:[\s._-]*E?\d{1,3})?\b/i, " ");
-    t = t.replace(/(?<!\d)\d{1,2}x\d{1,3}(?:\s*[-_]\s*\d{1,3})?(?!\d)/i, " ");
-    t = t.replace(/\bSeason[\s._-]*\d{1,3}[\s._-]*Episode[\s._-]*\d{1,3}\b/i, " ");
+    t = t.replace(/\bS\d{1,3}[\s-]*E\d{1,3}(?:[\s-]*E?\d{1,3})?\b/i, " ");
+    t = t.replace(/(?<!\d)\d{1,2}x\d{1,3}(?:\s*[-\s]\s*\d{1,3})?(?!\d)/i, " ");
+    t = t.replace(/\bSeason[\s-]*\d{1,3}[\s-]*Episode[\s-]*\d{1,3}\b/i, " ");
     // Trailing absolute episode number ("Show Name - 12").
-    t = t.replace(/[\s._-]+[-]?\s*\d{1,3}(?:v\d)?$/i, " ");
+    t = t.replace(/[\s-]+[-]?\s*\d{1,3}(?:v\d)?$/i, " ");
   }
 
-  // Channel specs must go before dots become spaces, and without a leading
-  // \b so "DDP5.1" is caught as well as a standalone "5.1".
+  // Channel specs must go before digits turn into separate words, and without
+  // a leading \b so "DDP5.1" is caught as well as a standalone "5.1".
   t = t.replace(/\d[.]\d(?!\d)/g, " ");
   t = t.replace(/\b\d{3,4}[pi]\b/gi, " ");          // 1080p 720p
   t = t.replace(/\b\d{3,4}x\d{3,4}\b/g, " ");        // 1920x1080
   t = t.replace(JUNK_RE, " ");
-  t = t.replace(/[\s._-]*[\(\[]\s*(19|20)\d{2}\s*[\)\]]/g, " ");
-  t = t.replace(/[\s._-]+(19|20)\d{2}$/, " ");
-  // Dots and underscores stand in for spaces in scene names.
-  t = t.replace(/[._]+/g, " ").replace(/\s+/g, " ").trim();
+  t = t.replace(/[\s]*[\(\[]\s*(19|20)\d{2}\s*[\)\]]/g, " ");
+  t = t.replace(/[\s-]+(19|20)\d{2}$/, " ");
+  t = t.replace(/\s+/g, " ").trim();
 
   // Trim trailing noise left behind by the substitutions above:
-  // "Severance DL DDP5.1 H.264" → "Severance". Bare digits and single
-  // letters at the end are codec/resolution fragments, never titles.
+  // "Severance DL DDP5 H 264" -> "Severance". Bare digits and single letters
+  // at the end are codec/resolution fragments, never titles.
   var words = t.split(" ");
   while (words.length > 1) {
     var last = words[words.length - 1].toLowerCase();
@@ -466,8 +476,8 @@ function cleanTitle(base, code) {
   }
   t = words.join(" ").trim();
 
-  // Any separators left dangling by the removals ("Breaking Bad -").
-  return t.replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, "").trim();
+  // Separators left dangling by the removals ("Breaking Bad -").
+  return t.replace(/^[\s\-\u2013\u2014:]+|[\s\-\u2013\u2014:]+$/g, "").trim();
 }
 
 function parseFilename(url) {
@@ -524,7 +534,7 @@ function autoIdentify(url) {
   panel.innerHTML = '<div class="msg"><span class="sp"></span>Matching '
     + htmlEsc(parsed.fileName) + '…</div>';
 
-  var candidates = titleCandidates(parsed.title);
+  var candidates = titleCandidates(parsed.title).slice(0, AUTO_MAX_TRIES);
   var deadline = autoTimerId;
 
   // Try each candidate in turn; the first with results wins.
@@ -933,8 +943,10 @@ iina.onMessage("overlayStatus", function(d){
   if(el) el.textContent = d.text||"";
 });
 // ── File changed ──────────────────────────────────────────────
-// Now URL-aware. If main.js sends a URL we've already
-// identified before, silently restore that pick instead of clearing.
+// URL-aware. A URL we've already identified restores instantly — but only
+// if the remembered episode still agrees with the filename. A stale entry
+// (typically a mis-pick saved against the wrong file) is re-identified
+// rather than silently replayed.
 iina.onMessage("fileChanged", function(d){
   currentVideoUrl = (d && d.url) || "";
   autoCancelTimer();
@@ -946,21 +958,29 @@ iina.onMessage("fileChanged", function(d){
   var map   = loadUrlMap();
   var saved = currentVideoUrl ? map[currentVideoUrl] : null;
 
+  // The filename is ground truth for season/episode; the cache is only
+  // authoritative about which show it is.
+  var stale = false;
   if (saved) {
-    // URL is already identified — restore silently
+    var now = parseFilename(currentVideoUrl);
+    if (now && now.code) {
+      stale = Number(saved.season || 0)  !== now.code.season ||
+              Number(saved.episode || 0) !== now.code.episode;
+    }
+  }
+
+  if (saved && !stale) {
+    // URL is already identified and still correct — restore silently.
     try { localStorage.setItem("epinfo_ep", JSON.stringify(saved)); } catch(e) {}
     showSaved(saved);
     iina.postMessage("episodeSelected", saved);
-  } else {
-    // Unknown URL — try to work it out from the filename. If the name has
-    // no episode code (a movie, an unusual name), autoIdentify returns false
-    // and the panel stays as the manual "search above" prompt.
-    if (!autoIdentify(currentVideoUrl)) {
-      try { localStorage.removeItem("epinfo_ep"); } catch(e) {}
-      document.getElementById("saved").classList.remove("on");
-      iina.postMessage("clearEpisode", {});
-    }
+  } else if (!autoIdentify(currentVideoUrl)) {
+    // Nothing usable in the filename — fall back to a manual prompt.
+    try { localStorage.removeItem("epinfo_ep"); } catch(e) {}
+    document.getElementById("saved").classList.remove("on");
+    iina.postMessage("clearEpisode", {});
   }
+  // else: autoIdentify is running and will replace the stale entry.
 });
 
 // ── API Key ───────────────────────────────────────────────────
