@@ -24,13 +24,19 @@ It understands the common release conventions:
 | `Doctor Who Season 2 Episode 7.mkv` | Doctor Who — S02E07 |
 | `[SubsPlease] Frieren - 05 (1080p).mkv` | Frieren — S01E05 |
 | `Attack on Titan - 12 [1080p].mkv` | Attack on Titan — S01E12 |
+| `The.Matrix.1999.1080p.BluRay.x264-GRP.mkv` | The Matrix (1999) |
+| `Footloose.1984.1080p.mkv` | Footloose — **1984**, not the 2011 remake |
+| `1917.2019.1080p.BluRay.x264.mkv` | 1917 (2019) |
 
 Quality/source/codec/release-group noise (`1080p`, `WEB-DL`, `DDP5.1`, `H.264`, `-NTb`,
 `[SubsPlease]`, …) is stripped before searching. Among several TMDB matches it takes the
 highest-voted one.
 
+Films work too: a name with no episode code but a release year is searched as a film, and the year
+is matched against TMDB so a remake never gets picked over the original.
+
 **When it can't tell,** it says so and leaves the normal search box there — you click once instead
-of four times. Films (no episode code in the name) are left alone rather than guessed at.
+of four times. A name with neither an episode code nor a year is left alone rather than guessed at.
 
 Identifications are remembered per file URL, so a replay costs nothing at all.
 

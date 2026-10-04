@@ -459,9 +459,12 @@ function cleanTitle(base, code) {
   t = t.replace(/\d[.]\d(?!\d)/g, " ");
   t = t.replace(/\b\d{3,4}[pi]\b/gi, " ");          // 1080p 720p
   t = t.replace(/\b\d{3,4}x\d{3,4}\b/g, " ");        // 1920x1080
-  t = t.replace(JUNK_RE, " ");
-  t = t.replace(/[\s]*[\(\[]\s*(19|20)\d{2}\s*[\)\]]/g, " ");
-  t = t.replace(/[\s-]+(19|20)\d{2}$/, " ");
+t = t.replace(JUNK_RE, " ");
+  t = t.replace(/\s+/g, " ").trim();
+  // Tolerate trailing space: the year strip is $-anchored and the junk pass
+  // above leaves it.
+  t = t.replace(/\s*[\(\[]\s*(19|20)\d{2}\s*[\)\]]/g, " ");
+  t = t.replace(/\s+(19|20)\d{2}\s*$/, " ");
   t = t.replace(/\s+/g, " ").trim();
 
   // Trim trailing noise left behind by the substitutions above:
@@ -493,7 +496,26 @@ function parseFilename(url) {
   var code = parseEpisodeCode(stripped) || parseEpisodeCode(base);
   var title = cleanTitle(base, code);
   if (!title || title.length < 2) return null;
-  return { fileName: fname, title: title, code: code };
+
+  // A release year, which is how a film is told apart from a TV episode: no
+  // episode code, but a year in the name. Resolutions and channel specs are
+  // removed first so "1920x1080" can't be read as the year 1920.
+  var yearSrc = base.replace(/\b\d{3,4}[pi]\b/gi, " ")
+                    .replace(/\b\d{3,4}x\d{3,4}\b/g, " ")
+                    .replace(/\d[.]\d(?!\d)/g, " ");
+  // Take the LAST year, not the first: in "1917.2019.1080p" the title is the
+  // number and the release year is the one after it.
+  var years = yearSrc.match(/(?:^|[^\d])((?:19|20)\d{2})(?=[^\d]|$)/g) || [];
+  var year = null;
+  if (years.length) {
+    year = parseInt(years[years.length - 1].replace(/[^\d]/g, ""), 10);
+  }
+
+  return {
+    fileName: fname, title: title, code: code, year: year,
+    // No episode code but a year: almost certainly a film.
+    isMovie: !code && !!year
+  };
 }
 
 function autoCancelTimer() {
@@ -521,10 +543,39 @@ function titleCandidates(title) {
   });
 }
 
+// Turn a matched movie into the same shape saveSelection expects.
+function applyAutoMovie(item) {
+  fetch("https://api.themoviedb.org/3/movie/" + item.id + "?api_key=" + TK)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!currentVideoUrl || !d.title) { resetPanel(); return; }
+      saveSelection({
+        showTitle:  "Movie",
+        epTitle:    d.title,
+        code:       (d.release_date || "").slice(0, 4),
+        airDate:    d.release_date || "",
+        isStream:   false,
+        rating:     d.vote_average ? d.vote_average.toFixed(1) : "",
+        overview:   d.overview || "",
+        posterUrl:  d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
+        tmdbId:     String(item.id),
+        season:     null,
+        episode:    null,
+        isMovie:    true
+      });
+    })
+    .catch(function() { resetPanel(); });
+}
+
 // Identify the file that just opened, without the user touching anything.
+// Handles both a TV episode (episode code in the name) and a film (no code
+// but a release year).
 function autoIdentify(url) {
   var parsed = parseFilename(url);
-  if (!parsed || !parsed.code || !TK) return false;
+  if (!parsed || !TK) return false;
+  // Need an episode code, or a year to identify a film by. A name with
+  // neither is left for the manual search.
+  if (!parsed.code && !parsed.isMovie) return false;
   // Already searching this URL (sidebarReady re-emits fileChanged).
   if (autoInFlight[url]) return true;
   autoInFlight[url] = true;
@@ -535,42 +586,63 @@ function autoIdentify(url) {
     + htmlEsc(parsed.fileName) + '…</div>';
 
   var candidates = titleCandidates(parsed.title).slice(0, AUTO_MAX_TRIES);
-  var deadline = autoTimerId;
+
+  function giveUp(msg) {
+    delete autoInFlight[url];
+    if (currentVideoUrl !== url || autoTimerId === null) return;
+    autoCancelTimer();
+    panel.innerHTML = '<div class="msg">' + msg + '</div>';
+  }
 
   // Try each candidate in turn; the first with results wins.
   function attempt(i) {
     if (i >= candidates.length) {
-      delete autoInFlight[url];
-      if (currentVideoUrl !== url) return;
-      if (autoTimerId === null) return;
-      autoCancelTimer();
-      panel.innerHTML = '<div class="msg">No match for '
-        + htmlEsc(parsed.fileName) + ' — search above.</div>';
+      giveUp("No match for " + htmlEsc(parsed.fileName) + " — search above.");
       return;
     }
+    var endpoint = parsed.isMovie ? "search/movie" : "search/tv";
     var q = encodeURIComponent(candidates[i]);
-    fetch("https://api.themoviedb.org/3/search/tv?api_key=" + TK + "&query=" + q)
+    fetch("https://api.themoviedb.org/3/" + endpoint + "?api_key=" + TK + "&query=" + q)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         delete autoInFlight[url];
         if (currentVideoUrl !== url || autoTimerId === null) return;
-        var list = (data.results || [])
-          .filter(function(x) { return x.media_type !== "movie" && x.name; });
-        if (!list.length) return attempt(i + 1);
+        var list, pick;
+
+        if (parsed.isMovie) {
+          list = (data.results || []).filter(function(x) { return x.title; });
+          if (!list.length) return attempt(i + 1);
+          // A matching release year is a far stronger signal than votes —
+          // remakes share titles, so "Footloose 1984" must not pick 2011.
+          var year = String(parsed.year);
+          list.sort(function(a, b) {
+            var sa = (a.vote_count || 0) + ((a.release_date || "").slice(0, 4) === year ? 1e6 : 0);
+            var sb = (b.vote_count || 0) + ((b.release_date || "").slice(0, 4) === year ? 1e6 : 0);
+            return sb - sa;
+          });
+          pick = list[0];
+          // Only auto-accept a film when the year agrees or nothing else
+          // scored; guessing a remake would be worse than asking.
+          if ((pick.release_date || "").slice(0, 4) !== year && list.length > 1) {
+            return attempt(i + 1);
+          }
+        } else {
+          list = (data.results || [])
+            .filter(function(x) { return x.media_type !== "movie" && x.name; });
+          if (!list.length) return attempt(i + 1);
+          // Highest-voted result is nearly always the right show.
+          list.sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
+          pick = list[0];
+        }
+
         autoCancelTimer();
-        // Highest-voted result is nearly always the right show.
-        list.sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
-        var pick = list[0];
-        document.getElementById("q").value = pick.name;
-        applyAutoMatch(pick, parsed.code);
+        document.getElementById("q").value = pick.title || pick.name || "";
+        if (parsed.isMovie) applyAutoMovie(pick);
+        else applyAutoMatch(pick, parsed.code);
       })
       .catch(function() {
-        delete autoInFlight[url];
-        if (currentVideoUrl !== url) return;
         // A network failure will hit every candidate; don't hammer TMDB.
-        if (autoTimerId === null) return;
-        autoCancelTimer();
-        panel.innerHTML = '<div class="msg">Lookup failed — search above.</div>';
+        giveUp("Lookup failed — search above.");
       });
   }
 
@@ -958,14 +1030,19 @@ iina.onMessage("fileChanged", function(d){
   var map   = loadUrlMap();
   var saved = currentVideoUrl ? map[currentVideoUrl] : null;
 
-  // The filename is ground truth for season/episode; the cache is only
-  // authoritative about which show it is.
+  // The filename is ground truth for season/episode, and for a film's year;
+  // the cache is only authoritative about which show it is.
   var stale = false;
   if (saved) {
     var now = parseFilename(currentVideoUrl);
     if (now && now.code) {
       stale = Number(saved.season || 0)  !== now.code.season ||
               Number(saved.episode || 0) !== now.code.episode;
+    } else if (now && now.isMovie && saved.isMovie) {
+      // A film identified under a different year is the wrong film.
+      stale = String(saved.airDate || saved.code || "").slice(0, 4) !== String(now.year);
+    } else if (now && now.isMovie && !saved.isMovie) {
+      stale = true;   // an episode identification on a film
     }
   }
 
