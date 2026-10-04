@@ -334,6 +334,9 @@ var descExpanded = false;
 // immune to all character escaping issues.
 var episodeCache = [];
 var seasonPosterUrl = "";
+// The show's title treatment, from the /tv/{id} detail response we already
+// fetch. Kept here so every episode of the show can reuse it.
+var showLogoUrl = "";
 
 // ── Filename parsing → automatic identification ─────────────────
 // Upstream required a manual search for every new file. This fork reads the
@@ -543,9 +546,42 @@ function titleCandidates(title) {
   });
 }
 
+// ── Title treatment (TMDB "logos") ─────────────────────────────────
+// TMDB carries the official title artwork — the KUNG FU PANDA / AVENGERS
+// style wordmarks — but not in the details response. It arrives via
+// `append_to_response=images`, so it costs no extra round trip.
+//
+// The array is a mess to pick from: for Fight Club it holds 26 entries
+// across a dozen languages and aspect ratios from 0.85 (a stacked poster
+// variant) to 8.5 (a thin wordmark). Title treatments are the wide ones,
+// so anything squarer than 2.5:1 is rejected outright, then the best-rated
+// of what remains wins. Returns null when the title has no usable logo,
+// which is common — the caller falls back to text.
+function pickLogo(images) {
+  var logos = (images && images.logos) || [];
+  var best = null, bestScore = -1;
+  for (var i = 0; i < logos.length; i++) {
+    var l = logos[i];
+    if (!l || !l.file_path) continue;
+    // Only English or language-neutral artwork; a Hebrew or Portuguese
+    // wordmark would be wrong here.
+    if (l.iso_639_1 && l.iso_639_1 !== "en") continue;
+    if (!(l.aspect_ratio >= 2.5)) continue;
+    // Vote average is TMDB's own quality signal for an image. Reward a
+    // genuinely wide wordmark, but not so much that a 8:1 hairline with a
+    // 79px height beats a solid 4:1 one.
+    var wide = l.aspect_ratio >= 3 ? 1 : 0;
+    var score = wide * 2 + (l.vote_average || 0);
+    if (score > bestScore) { bestScore = score; best = l; }
+  }
+  // w780 keeps a wide wordmark crisp on Retina without pulling the
+  // multi-megabyte original.
+  return best ? "https://image.tmdb.org/t/p/w780" + best.file_path : "";
+}
+
 // Turn a matched movie into the same shape saveSelection expects.
 function applyAutoMovie(item) {
-  fetch("https://api.themoviedb.org/3/movie/" + item.id + "?api_key=" + TK)
+  fetch("https://api.themoviedb.org/3/movie/" + item.id + "?api_key=" + TK + "&append_to_response=images")
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!currentVideoUrl || !d.title) { resetPanel(); return; }
@@ -558,6 +594,7 @@ function applyAutoMovie(item) {
         rating:     d.vote_average ? d.vote_average.toFixed(1) : "",
         overview:   d.overview || "",
         posterUrl:  d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
+        logoUrl:    pickLogo(d.images),
         tmdbId:     String(item.id),
         season:     null,
         episode:    null,
@@ -660,13 +697,14 @@ function autoIdentify(url) {
 
 // Fetch the season list and select the parsed episode in one go.
 function applyAutoMatch(item, code) {
-  fetch("https://api.themoviedb.org/3/tv/" + item.id + "?api_key=" + TK)
+  fetch("https://api.themoviedb.org/3/tv/" + item.id + "?api_key=" + TK + "&append_to_response=images")
     .then(function(r) { return r.json(); })
     .then(function(show) {
       if (!currentVideoUrl) return;
       selShow = item;
       selShow._name = show.name;
       selShow._seasons = (show.seasons || []).filter(function(s) { return s.season_number > 0; });
+      showLogoUrl = pickLogo(show.images);
 
       // If the filename named a season the show doesn't have, fall back to
       // the closest real one rather than failing outright.
@@ -860,11 +898,12 @@ function pickItem(item) {
   selShow   = item;
   selSeason = null;
   episodeCache = [];
+  showLogoUrl = "";
 
   if (item.media_type === "movie") {
     document.getElementById("panel").innerHTML =
       '<div class="msg"><span class="sp"></span>Loading…</div>';
-    fetch("https://api.themoviedb.org/3/movie/"+item.id+"?api_key="+TK)
+    fetch("https://api.themoviedb.org/3/movie/"+item.id+"?api_key="+TK+"&append_to_response=images")
       .then(function(r){return r.json();})
       .then(function(d){
         var info = { showTitle:"Movie", epTitle:d.title,
@@ -873,6 +912,7 @@ function pickItem(item) {
           rating:d.vote_average?d.vote_average.toFixed(1):"",
           overview:d.overview||"",
           posterUrl:d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
+          logoUrl: pickLogo(d.images),
           tmdbId: String(item.id), season: null, episode: null, isMovie: true };
         saveSelection(info);
       }).catch(function(){
@@ -883,11 +923,12 @@ function pickItem(item) {
 
   document.getElementById("panel").innerHTML =
     '<div class="msg"><span class="sp"></span>Loading seasons…</div>';
-  fetch("https://api.themoviedb.org/3/tv/"+item.id+"?api_key="+TK)
+  fetch("https://api.themoviedb.org/3/tv/"+item.id+"?api_key="+TK+"&append_to_response=images")
     .then(function(r){return r.json();})
     .then(function(show){
       selShow._name    = show.name;
       selShow._seasons = (show.seasons||[]).filter(function(s){return s.season_number>0;});
+      showLogoUrl      = pickLogo(show.images);
       renderSeasons();
     }).catch(function(){
       document.getElementById("panel").innerHTML='<div class="msg">Failed to load seasons.</div>';
@@ -968,6 +1009,7 @@ function pickEp(idx) {
     rating:    ep.vote_average?ep.vote_average.toFixed(1):"",
     overview:  ep.overview||"",
     posterUrl: seasonPosterUrl || (selShow && selShow.poster_path ? "https://image.tmdb.org/t/p/w500" + selShow.poster_path : ""),
+    logoUrl: showLogoUrl,
     tmdbId: String(selShow.id), season: selSeason, episode: ep.episode_number, isMovie: false
   };
   saveSelection(info);

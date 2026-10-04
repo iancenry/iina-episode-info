@@ -146,6 +146,10 @@ function showOverlay(d) {
     rating:      d.rating     || "",
     overview:    d.overview   || "",
     posterUrl:   d.posterUrl  || "",
+    // TMDB title treatment, when the title has one and it is wide enough to
+    // be worth using. Empty string otherwise, and the overlay keeps text.
+    logoUrl:     d.logoUrl    || "",
+    isMovie:     !!d.isMovie,
     bgOpacity:   overlayBgOpacity,
     verticalPos: overlayVerticalPos,
     theme:       overlayTheme

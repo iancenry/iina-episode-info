@@ -40,14 +40,30 @@ of four times. A name with neither an episode code nor a year is left alone rath
 
 Identifications are remembered per file URL, so a replay costs nothing at all.
 
-### 2. Subtitles removed
+### 2. Title treatments
+
+Where TMDB has the official wordmark — the KUNG FU PANDA / AVENGERS style
+title art — the card shows it instead of the text title. For a film the
+wordmark stands in for the title entirely; for an episode it sits above the
+episode title, which stays as text because the logo belongs to the show.
+
+Coverage is uneven and TMDB's logo arrays need filtering: Fight Club has 26
+entries across a dozen languages and aspect ratios from 0.85 (a stacked
+poster variant) to 8.5 (a thin wordmark). Anything squarer than 2.5:1 or
+non-English is rejected. Plenty of titles have no usable logo, and those
+fall back to text automatically.
+
+It costs no extra network round trip — the images sub-resource is folded
+into the detail request already being made with `append_to_response=images`.
+
+### 3. Subtitles removed
 
 All OpenSubtitles / SubDL / Wyzie code is gone — about 1,300 lines. With it went the
 `file-system` permission, the temporary-directory/unzip pipeline, and the shell-outs that came
 with it. The plugin now holds three permissions (`show-osd`, `video-overlay`, `network-request`)
 and contacts only TMDB, unless you turn on skip intro.
 
-### 3. Upstream fixes carried over
+### 4. Upstream fixes carried over
 
 - `overlay.html`'s `esc()` didn't escape `'`, but the poster `<img>` interpolates into a
   single-quoted attribute — a crafted `posterUrl` could inject markup into the overlay.
@@ -142,6 +158,21 @@ Runs a daily CI job that probes each endpoint and opens (and auto-closes) an iss
 Add `TMDB_API_KEY` to `.env` to also verify response shapes; without it the endpoints are still
 proven alive and enforcing auth.
 
+## Attribution
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+Title treatments, posters and episode data come from
+[themoviedb.org](https://www.themoviedb.org). Images are served from
+`image.tmdb.org` under TMDB's terms. TMDB requires this notice to be shown
+wherever their data is displayed; it is reproduced here in full.
+
+Skip-intro timings come from IntroDB, TheIntroDB, SkipDB and
+[AniSkip](https://aniskip.com), which are independent community services
+with no affiliation to this plugin or to TMDB.
+
 ## License
 
-MIT — see [LICENSE](LICENSE). Original work © Zain Imam.
+MIT — see [LICENSE](LICENSE). Fork of
+[Zain-Imam/iina-episode-info](https://github.com/Zain-Imam/iina-episode-info).
+Original work © Zain Imam.

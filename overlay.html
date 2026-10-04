@@ -37,6 +37,24 @@
     display:flex; align-items:center; gap:40px;
   }
 
+  /* ── Title treatment ──────────────────────────────────────────
+     TMDB's official wordmark, shown instead of the show-name line. For a
+     film it stands in for the title entirely. object-fit:contain matters —
+     many logos are uploaded with wide transparent margins, and without it
+     the wordmark renders tiny. */
+  #logo {
+    display: none;
+    margin-bottom: 10px;
+  }
+  #logo img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    max-height: 40px;
+    object-fit: contain;
+    object-position: left center;
+  }
+
   /* ── Text column ───────────────────────────────────────────── */
   #text { flex:1; min-width:0; }
 
@@ -93,6 +111,11 @@
   }
   #wrap[data-theme="compact"] #text { display:block; }
 
+  /* Compact is one line by design: the wordmark stands in for the show
+     name and is sized to match the 20px episode title beside it. */
+  #wrap[data-theme="compact"] #logo { margin-bottom: 5px; }
+  #wrap[data-theme="compact"] #logo img { max-height: 22px; }
+
   /* ── Theme: Poster Focus ───────────────────────────────────────
      A floating rounded card rather than a full-width bar, with the
      poster leading on the left and a fuller synopsis. */
@@ -104,10 +127,17 @@
   }
   #wrap[data-theme="poster"] #poster { width:16vw; max-width:180px; min-width:120px; }
   #wrap[data-theme="poster"] #poster img { box-shadow:0 10px 40px rgba(0,0,0,0.8); opacity:1; }
+  #wrap[data-theme="poster"] #logo { margin-bottom:12px; }
+  #wrap[data-theme="poster"] #logo img { max-height: 54px; }
   #wrap[data-theme="poster"] .sn { margin-bottom:7px; }
   #wrap[data-theme="poster"] .et { font-size:30px; margin-bottom:9px; white-space:normal; }
   #wrap[data-theme="poster"] .mt { margin-bottom:11px; }
   #wrap[data-theme="poster"] .ov { -webkit-line-clamp:4; font-size:15px; line-height:1.55; }
+
+  /* For a film the wordmark IS the title, so it gets the title's slot and
+     scale rather than a header above it. */
+  #wrap[data-logo="movie"] #logo { margin-bottom: 14px; }
+  #wrap[data-logo="movie"] #logo img { max-height: 62px; }
 
   /* ── Skip pill ─────────────────────────────────────────────────
      Independent of the info card: it must be able to show while the
@@ -149,6 +179,7 @@
 <div id="wrap">
   <div id="card">
     <div id="text">
+      <div id="logo"></div>
       <div class="sn" id="show-name"></div>
       <div class="et" id="ep-title"></div>
       <div class="mt" id="meta-row"></div>
@@ -216,6 +247,32 @@ iina.onMessage("showData", function(d) {
 
   // Episode title
   document.getElementById("ep-title").textContent = d.epTitle || "";
+
+  // TMDB title treatment. When there is no usable logo — which is most of
+  // the time — nothing changes and the text lines stand on their own.
+  // Reset first, every time: a film hides the text lines, so without this a
+  // show shown next would inherit the hidden state and lose its title.
+  var logoEl = document.getElementById("logo");
+  var nameEl = document.getElementById("show-name");
+  var titleEl = document.getElementById("ep-title");
+  var wrapEl = document.getElementById("wrap");
+  logoEl.innerHTML = "";
+  logoEl.style.display = "none";
+  nameEl.style.display = "";
+  titleEl.style.display = "";
+  wrapEl.removeAttribute("data-logo");
+
+  if (d.logoUrl) {
+    logoEl.innerHTML = '<img src="' + esc(d.logoUrl) + '" alt="" />';
+    logoEl.style.display = "block";
+    // A film's own title is the wordmark, so the placeholder "MOVIE" header
+    // and the now-redundant text title both step aside.
+    if (d.isMovie) {
+      nameEl.style.display = "none";
+      titleEl.style.display = "none";
+      wrapEl.setAttribute("data-logo", "movie");
+    }
+  }
 
   // Meta row: code · airDate · ★ rating
   var parts = [];
