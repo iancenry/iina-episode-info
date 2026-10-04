@@ -732,6 +732,38 @@ function applyAutoMatch(item, code) {
     });
 }
 
+// ── Remembered-URL map housekeeping ──────────────────────────────
+// Entries were never removed, so this map only ever grew — one per file
+// ever opened, kept even after the file is deleted or renamed. Each entry
+// now carries a lastSeen stamp, refreshed every time its file is opened, and
+// anything untouched for six months is dropped at launch.
+//
+// Ageing rather than stat()ing is deliberate. iina.file.exists() would give an
+// exact answer but needs the file-system permission, which this fork dropped
+// along with the SubDL extraction path — and a disk-wide permission is not
+// worth re-adding to tidy a few kilobytes. A count cap was rejected too: it
+// evicts files that are still being watched, and because the entry is simply
+// gone the only symptom is a slightly slower card, which is the worst kind of
+// regression to have.
+var URL_MAP_MAX_AGE_DAYS = 180;
+var URL_MAP_MAX_AGE_MS = URL_MAP_MAX_AGE_DAYS * 86400000;
+
+function pruneUrlMap() {
+  var m = loadUrlMap(), keys = Object.keys(m), now = Date.now(), dropped = 0;
+  for (var i = 0; i < keys.length; i++) {
+    var e = m[keys[i]];
+    // Entries written before stamping existed have no lastSeen. Keep them:
+    // treating a missing stamp as stale would wipe the user's history the
+    // first time this ran.
+    if (e && typeof e.lastSeen === "number" && (now - e.lastSeen) > URL_MAP_MAX_AGE_MS) {
+      delete m[keys[i]];
+      dropped++;
+    }
+  }
+  if (dropped) saveUrlMap(m);
+  return dropped;
+}
+
 // ── URL → episode map ─────────────────────────
 // Each video URL gets its own remembered TMDB identification so the
 // user doesn't have to re-search when re-playing the same file/stream.
@@ -747,7 +779,14 @@ function saveUrlMap(m) {
 function saveCurrentUrlInfo(info) {
   if (!currentVideoUrl) return;
   var m = loadUrlMap();
-  m[currentVideoUrl] = info;
+  // Shallow copy so the stamp doesn't leak back into the caller's object,
+  // which also gets posted to main.js and stored as the current episode.
+  var entry = {};
+  for (var k in info) {
+    if (Object.prototype.hasOwnProperty.call(info, k)) entry[k] = info[k];
+  }
+  entry.lastSeen = Date.now();
+  m[currentVideoUrl] = entry;
   saveUrlMap(m);
 }
 function clearCurrentUrlFromMap() {
@@ -1096,6 +1135,7 @@ iina.onMessage("fileChanged", function(d){
   if (saved && !stale) {
     // URL is already identified and still correct — restore silently.
     try { localStorage.setItem("epinfo_ep", JSON.stringify(saved)); } catch(e) {}
+    saveCurrentUrlInfo(saved);   // refresh lastSeen so it never ages out
     showSaved(saved);
     iina.postMessage("episodeSelected", saved);
   } else if (!autoIdentify(currentVideoUrl)) {
@@ -1477,6 +1517,7 @@ function renderRecents() {
     renderSearches();
     pruneRecents();
     renderRecents();
+    pruneUrlMap();
 
     // All settings have been pushed — tell main.js it's safe to re-emit
     // fileChanged so we can do the per-URL TMDB restore.
@@ -1502,14 +1543,29 @@ iina.onMessage("overlayShowing", function(d) {
 <script>
 // Collapsible sidebar sections — remember open/closed state across launches.
 (function () {
+  var live = {};
   document.querySelectorAll("details.sub-sec").forEach(function (d) {
     var key = "epinfo_open_" + d.getAttribute("data-k");
+    live[key] = 1;
     var saved = localStorage.getItem(key);
     if (saved !== null) d.open = saved === "1";
     d.addEventListener("toggle", function () {
       try { localStorage.setItem(key, d.open ? "1" : "0"); } catch (e) {}
     });
   });
+
+  // Drop stored state for sections that no longer exist. The three subtitle
+  // sections were removed from this fork, but the keys they wrote persist.
+  // The live set is derived from the DOM, so this stays correct if sections
+  // are added or removed again.
+  try {
+    var dead = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("epinfo_open_") === 0 && !live[k]) dead.push(k);
+    }
+    dead.forEach(function (k) { localStorage.removeItem(k); });
+  } catch (e) {}
 })();
 </script>
 </body>
