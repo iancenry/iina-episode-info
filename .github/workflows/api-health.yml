@@ -37,12 +37,9 @@ jobs:
       - name: Run API health check
         id: health
         env:
-          # Optional: without them the run still verifies every endpoint is
+          # Optional: without it the run still verifies every endpoint is
           # alive and enforcing auth, but not the response shapes.
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
-          SUBDL_API_KEY: ${{ secrets.SUBDL_API_KEY }}
-          WYZIE_API_KEY: ${{ secrets.WYZIE_API_KEY }}
         run: node scripts/check-apis.mjs
 
       - name: Open an issue when something breaks

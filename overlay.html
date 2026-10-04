@@ -169,10 +169,12 @@
 
 <script>
 // ── Helper: HTML-escape text going into innerHTML ─────────────
+// Must escape ' as well as " — the poster <img> below interpolates into a
+// single-quoted attribute, so an unescaped ' would break out of it.
 function esc(s) {
   return String(s || "")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
 // ── Apply vertical position ───────────────────

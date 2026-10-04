@@ -7,11 +7,9 @@
 //
 //   node scripts/check-apis.mjs
 //
-// Keys (TMDB_API_KEY, OPENSUBTITLES_API_KEY, SUBDL_API_KEY, WYZIE_API_KEY) are
-// read from the environment or a local .env, and are optional: without them the
-// endpoints are still checked for being alive and enforcing auth, which is what
-// catches a moved or retired API. Never calls OpenSubtitles' /download, so it
-// cannot consume the free daily quota.
+// TMDB_API_KEY is read from the environment or a local .env and is optional:
+// without it the endpoints are still checked for being alive and enforcing
+// auth, which is what catches a moved or retired API.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -45,7 +43,7 @@ function loadDotEnv() {
 
 const INFO = JSON.parse(readFileSync(join(ROOT, "Info.json"), "utf8"));
 
-// Matches the plugin's own User-Agent; OpenSubtitles rejects requests without one.
+// Identifies this script to the APIs it probes.
 const UA = `EpisodeInfo v${INFO.version}`;
 const TIMEOUT_MS = 20000;
 const RETRIES = 3;
@@ -55,10 +53,6 @@ const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 // Stable, heavily-subtitled fixtures.
 const TV = { tmdb: 1399, imdb: "tt0944947", name: "Game of Thrones" };
 const MOVIE = { tmdb: 550, imdb: "tt0137523", name: "Fight Club" };
-
-// Same normalisation as stripTtAndZeros() in main.js. OpenSubtitles returns an
-// HTML error page for ids that keep their leading zeros, so this matters.
-const bareImdb = (id) => String(id).replace(/^tt/i, "").replace(/^0+/, "");
 
 const results = [];
 const record = (name, status, detail) => {
@@ -217,100 +211,7 @@ async function checkTmdbImages() {
   return { detail: `${base}w92 serving images` };
 }
 
-// 3. OpenSubtitles — search only, never /download (protects the free quota).
-async function checkOpenSubtitles() {
-  const key = process.env.OPENSUBTITLES_API_KEY;
-  // The plugin's primary TV path — proves season/episode params are still honoured.
-  const url = `https://api.opensubtitles.com/api/v1/subtitles?parent_imdb_id=${bareImdb(TV.imdb)}`
-    + "&season_number=1&episode_number=1&languages=en";
-
-  if (!key) {
-    const r = await get(url);
-    // 401/403 both prove the route exists and is enforcing auth as documented.
-    need([401, 403].includes(r.status), `expected 401/403 without a key, got HTTP ${r.status}`);
-    need(r.json !== null, "error response was not JSON — service may have changed");
-    return { skip: `no OPENSUBTITLES_API_KEY — endpoint alive (HTTP ${r.status}, JSON error)` };
-  }
-
-  const r = await get(url, { headers: { "Api-Key": key } });
-  need(r.status === 200, `HTTP ${r.status}${r.json?.message ? ` (${r.json.message})` : ""}`);
-  need(Array.isArray(r.json?.data), "response.data array missing (main.js reads body.data)");
-  if (r.json.data.length > 0) {
-    const a = r.json.data[0].attributes;
-    need(a, "result missing .attributes");
-    need(Array.isArray(a.files), "result missing attributes.files (file_id feeds the download call)");
-  }
-  return { detail: `${r.json.data.length} subtitles returned, shape intact` };
-}
-
-// 4. SubDL
-async function checkSubdl() {
-  const key = process.env.SUBDL_API_KEY;
-  const base = "https://api.subdl.com/api/v1/subtitles";
-
-  if (!key) {
-    const r = await get(`${base}?api_key=INVALID_KEY_HEALTHCHECK&film_name=${encodeURIComponent(MOVIE.name)}`);
-    need([401, 403].includes(r.status), `expected 401/403 without a key, got HTTP ${r.status}`);
-    need(r.json?.status === false, "error body missing status:false — response contract changed");
-    return { skip: `no SUBDL_API_KEY — endpoint alive (HTTP ${r.status}, ${r.json?.error || "auth enforced"})` };
-  }
-
-  const qs = new URLSearchParams({
-    api_key: key, tmdb_id: String(TV.tmdb), type: "tv",
-    season_number: "1", episode_number: "1", languages: "EN", subs_per_page: "5",
-  });
-  const r = await get(`${base}?${qs}`);
-  need(r.status === 200, `HTTP ${r.status}${r.json?.error ? ` (${r.json.error})` : ""}`);
-  need(r.json?.status === true, `status was ${JSON.stringify(r.json?.status)} (main.js requires status === true)`);
-  need(Array.isArray(r.json?.subtitles), "subtitles array missing");
-  if (r.json.subtitles.length > 0) {
-    need("url" in r.json.subtitles[0], "subtitle entry has no url (used to download the zip)");
-  }
-  return { detail: `${r.json.subtitles.length} subtitles returned, status:true` };
-}
-
-// SubDL hands back zip archives from a separate host — make sure it is up.
-async function checkSubdlCdn() {
-  const r = await get("https://dl.subdl.com/");
-  need(r.status < 500, `dl.subdl.com returned HTTP ${r.status}`);
-  return { detail: `dl.subdl.com reachable (HTTP ${r.status})` };
-}
-
-// 5. Wyzie
-async function checkWyzie() {
-  const key = process.env.WYZIE_API_KEY;
-  const params = new URLSearchParams({
-    id: TV.imdb, season: "1", episode: "1", format: "srt", language: "en",
-  });
-  if (key) params.set("key", key);
-  const r = await get(`https://sub.wyzie.io/search?${params}`);
-
-  if (!key) {
-    need(r.status === 401, `expected 401 without a key, got HTTP ${r.status}`);
-    need(/api key/i.test(r.json?.message || ""), `unexpected error body: ${r.text.slice(0, 120)}`);
-    return { skip: `no WYZIE_API_KEY — endpoint alive (HTTP 401, "${r.json.message}")` };
-  }
-
-  need(r.status === 200, `HTTP ${r.status}${r.json?.message ? ` (${r.json.message})` : ""}`);
-  const arr = Array.isArray(r.json) ? r.json : r.json?.results;
-  need(Array.isArray(arr), "expected a JSON array of subtitles (main.js reads the array directly)");
-  if (arr.length > 0) need("url" in arr[0], "subtitle entry has no url");
-  return { detail: `${arr.length} subtitles returned` };
-}
-
-// The plugin used to call sub.wyzie.ru. Warn if the .io host it now calls
-// ever starts redirecting somewhere else again.
-async function checkWyzieHost() {
-  const res = await fetch("https://sub.wyzie.io/search?id=tt0944947", {
-    redirect: "manual", headers: { "User-Agent": UA },
-  });
-  if (res.status >= 300 && res.status < 400) {
-    return { warn: `sub.wyzie.io now redirects to ${res.headers.get("location")} — update main.js` };
-  }
-  return { detail: `sub.wyzie.io answers directly (HTTP ${res.status}, no redirect)` };
-}
-
-// 6. Every host in Info.json resolves and answers. Catches a domain move
+// Every host in Info.json resolves and answers. Catches a domain move
 async function checkAllowlistedHostsLive() {
   const info = JSON.parse(readFileSync(join(ROOT, "Info.json"), "utf8"));
   const dead = [];
@@ -327,7 +228,7 @@ async function checkAllowlistedHostsLive() {
 }
 
 
-// 6. Skip-intro sources. Each is optional, so this fails only when one is
+// Skip-intro sources. Each is optional, so this fails only when one is
 //    genuinely broken or none are usable. 401/403/429 means this runner is
 //    blocked — these sit behind Cloudflare, which challenges datacenter IPs
 //    while serving real users normally.
@@ -372,7 +273,7 @@ async function checkSkipSources() {
   return { detail: `all ${ok.length} sources answering with the expected shape` };
 }
 
-// 7. Anime chain: IMDB -> MyAnimeList via ARM, then AniSkip. An outage here
+// Anime chain: IMDB -> MyAnimeList via ARM, then AniSkip. An outage here
 //    degrades anime lookups only, so blocked or unreachable warns rather
 //    than fails; a changed contract still fails.
 async function checkAnimeChain() {
@@ -411,7 +312,7 @@ async function checkAnimeChain() {
 // Run everything, then write the summary.
 const fromDotEnv = loadDotEnv();
 
-const KEY_NAMES = ["TMDB_API_KEY", "OPENSUBTITLES_API_KEY", "SUBDL_API_KEY", "WYZIE_API_KEY"];
+const KEY_NAMES = ["TMDB_API_KEY"];
 const configured = KEY_NAMES.filter((k) => process.env[k]);
 
 console.log("Episode Info — API health check");
@@ -429,11 +330,6 @@ await check("Info.json allow-list covers every called host", checkAllowlist);
 await check("TMDB — all routes used by the plugin", checkTmdbRoutes);
 await check("TMDB — response shape (search, ids, episodes)", checkTmdbShape);
 await check("TMDB — image CDN and poster paths", checkTmdbImages);
-await check("OpenSubtitles — search endpoint", checkOpenSubtitles);
-await check("SubDL — search endpoint", checkSubdl);
-await check("SubDL — download host", checkSubdlCdn);
-await check("Wyzie — search endpoint", checkWyzie);
-await check("Wyzie — host still answers directly", checkWyzieHost);
 await check("Skip-intro sources (IntroDB/TheIntroDB/SkipDB)", checkSkipSources);
 await check("Anime chain (ARM \u2192 AniSkip)", checkAnimeChain);
 await check("All allow-listed hosts reachable", checkAllowlistedHostsLive);
@@ -454,11 +350,11 @@ const summary = [
   "",
 ];
 
-if (skipped.length) {
+    if (skipped.length) {
   summary.push(
-    "> **Skipped checks** need repository secrets to run in full: `TMDB_API_KEY`, " +
-    "`OPENSUBTITLES_API_KEY`, `SUBDL_API_KEY`, `WYZIE_API_KEY`. Without them the endpoints " +
-    "are still proven alive and enforcing auth — only the response shapes go unverified.",
+    "> **Skipped checks** need the `TMDB_API_KEY` repository secret to run in full. " +
+    "Without it the endpoints are still proven alive and enforcing auth — " +
+    "only the response shapes go unverified.",
     ""
   );
 }
