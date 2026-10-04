@@ -23,6 +23,8 @@
   }
   #s-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 1.3; }
   #s-meta  { font-size: 11px; color: rgba(255,255,255,.45); margin-bottom: 8px; }
+  #s-ctx   { font-size: 11px; color: rgba(255,255,255,.32); margin: -5px 0 8px; }
+  #s-ctx:empty { display: none; }
   #s-meta .rat { color: #f5c518; }
 
   /* Description with show more */
@@ -211,6 +213,7 @@
   <div id="s-show"></div>
   <div id="s-title"></div>
   <div id="s-meta"></div>
+  <div id="s-ctx"></div>
   <div id="s-desc" class="collapsed"></div>
   <button id="show-more" onclick="toggleDesc()">Show more ▾</button>
   <button id="clear-btn" onclick="doClear()">✕  Clear selection</button>
@@ -333,6 +336,9 @@ var descExpanded = false;
 // attribute and silently break the button. Index-based lookup is
 // immune to all character escaping issues.
 var episodeCache = [];
+// Totals from the show detail response, for the "Season 2 of 3" context line.
+// Null until a show has been opened.
+var showTotals = null;
 var seasonPosterUrl = "";
 // The show's title treatment, from the /tv/{id} detail response we already
 // fetch. Kept here so every episode of the show can reuse it.
@@ -402,20 +408,25 @@ function fileNameFromUrl(url) {
 
 // "Show Name S01E02" → {season:1, episode:2}
 function parseEpisodeCode(base) {
+  // seasonFromName records whether the season was actually written in the
+  // filename or merely assumed. The absolute-number convention carries no
+  // season at all, and for "Show/Season 2/05.mkv" the directory is a better
+  // authority than that assumption — but it must never override a season the
+  // filename states outright.
   var pats = [
     // S01E02, s1e2, S01.E02, S01E02E03 (multi-episode pack)
     { re: /\bS(\d{1,3})[\s._-]*E(\d{1,3})(?:\s*[-_]?\s*E?(\d{1,3}))?\b/i,
-      map: function(m) { return { season:+m[1], episode:+m[2], extra: m[3] ? +m[3] : null }; } },
+      map: function(m) { return { season:+m[1], episode:+m[2], extra: m[3] ? +m[3] : null, seasonFromName: true }; } },
     // 1x02
     { re: /(?<!\d)(\d{1,2})x(\d{1,3})(?:\s*[-_]\s*(\d{1,3}))?(?!\d)/i,
-      map: function(m) { return { season:+m[1], episode:+m[2], extra: m[3] ? +m[3] : null }; } },
+      map: function(m) { return { season:+m[1], episode:+m[2], extra: m[3] ? +m[3] : null, seasonFromName: true }; } },
     // Season 1 Episode 2
     { re: /\bSeason[\s._-]*(\d{1,3})[\s._-]*Episode[\s._-]*(\d{1,3})\b/i,
-      map: function(m) { return { season:+m[1], episode:+m[2], extra:null }; } },
+      map: function(m) { return { season:+m[1], episode:+m[2], extra:null, seasonFromName: true }; } },
     // "Show Name - 12" — absolute episode number, the common anime/scene
     // convention. Anchored to the end so a year can't be mistaken for one.
     { re: /^(.*?)[\s._-]+[-]?\s*(\d{1,3})(?:v\d)?$/i,
-      map: function(m) { return { season:1, episode:+m[2], extra:null }; } }
+      map: function(m) { return { season:1, episode:+m[2], extra:null, seasonFromName: false }; } }
   ];
   for (var i = 0; i < pats.length; i++) {
     var m = base.match(pats[i].re);
@@ -486,10 +497,117 @@ t = t.replace(JUNK_RE, " ");
   return t.replace(/^[\s\-\u2013\u2014:]+|[\s\-\u2013\u2014:]+$/g, "").trim();
 }
 
+// ── Folder hints ─────────────────────────────────────────────────
+// Some libraries carry the show in the directory and nothing but a number in
+// the file: "Severance/Season 2/05.mkv". No amount of filename parsing can
+// identify that, so the directory names are the only other place a title can
+// come from.
+
+// Directories that describe the library rather than the show. "Downloads" and
+// "Videos" sit at the top of almost every tree, so the walk has to step over
+// them rather than search for them.
+var FOLDER_NOISE = {
+  videos: 1, video: 1, movies: 1, movie: 1, films: 1, film: 1, shows: 1,
+  show: 1, tv: 1, television: 1, series: 1, anime: 1, episodes: 1,
+  episode: 1, seasons: 1, season: 1, complete: 1, collection: 1, media: 1,
+  downloads: 1, download: 1, desktop: 1, documents: 1, tmp: 1, temp: 1,
+  data: 1, unsorted: 1, new: 1, misc: 1, other: 1, public: 1, share: 1,
+  users: 1, user: 1, volume: 1, mediafolder: 1
+};
+
+// How far up the tree to look. "Show/Season 2/05.mkv" needs two levels, and
+// past three the names belong to the disk, not the show.
+var FOLDER_LOOKUP_DEPTH = 3;
+
+function pathSegments(url) {
+  var s = String(url || "");
+  try { s = decodeURIComponent(s); } catch(e) {}
+  s = s.split("#")[0].split("?")[0];
+  var parts = s.split("/").filter(Boolean);
+  // Drop the filename so only directories are left. A part with no extension
+  // is assumed to be a directory, which is why a bare "05" cannot be mistaken
+  // for a show title.
+  if (parts.length && /\.[a-z0-9]{2,4}$/i.test(parts[parts.length - 1])) parts.pop();
+  return parts;
+}
+
+// A name that cannot be a show title, however it is spelled.
+function isRealTitle(t) {
+  if (!t || t.length < 2) return false;
+  // Digits alone are an episode number or a year, not a name — except where a
+  // film really is called "1917", which is why the caller only discards these
+  // when a directory name is available to take their place.
+  if (/^\d+$/.test(t)) return false;
+  return !isPlaceholderTitle(t);
+}
+
+// A word that stands in for a title rather than being one. Kept separate from
+// isRealTitle because these can be discarded outright, whereas a numeric title
+// like "1917" is a real one and may only be replaced, never dropped. Anchored
+// to the end so that a title merely starting with the letters — "E.V.A." —
+// is not mistaken for one.
+function isPlaceholderTitle(t) {
+  return !!t && /^(?:episode|ep|e|part|pt|disc|cd|dvd|vol|volume|file|track)\.?$/i.test(t.trim());
+}
+
+// Directory names only, so ["Severance", "Season 2"] for
+// "file:///…/Severance/Season 2/05.mkv".
+function parseFolderHints(url) {
+  var segs = pathSegments(url);
+  var out = { title: "", season: null, year: null };
+  var floor = Math.max(0, segs.length - FOLDER_LOOKUP_DEPTH);
+
+  for (var i = segs.length - 1; i >= floor; i--) {
+    var seg = segs[i];
+    if (!seg) continue;
+
+    // "Season 2" or "S02" as a whole segment: a season, never a title.
+    var whole = /^(?:season|s)[\s._-]*(\d{1,3})$/i.exec(seg);
+    if (whole) {
+      if (out.season === null) out.season = parseInt(whole[1], 10);
+      continue;
+    }
+    // "Severance Season 2" — one segment holding both.
+    var inner = /\bseason[\s._-]*(\d{1,3})\b/i.exec(seg);
+    if (inner) {
+      if (out.season === null) out.season = parseInt(inner[1], 10);
+      var rest = cleanTitle(seg.replace(inner[0], " "), null);
+      if (isRealTitle(rest)) { out.title = rest; break; }
+      continue;
+    }
+    // A bare year directory is the film's date, not its title.
+    if (/^(?:19|20)\d{2}$/.test(seg)) {
+      if (out.year === null) out.year = parseInt(seg, 10);
+      break;
+    }
+    // Anything below this point describes the disk rather than the show, and
+    // the walk stops rather than stepping over it: continuing upward is what
+    // ended up naming a show after the user's own home directory.
+    if (/^\d{3,4}[pi]$/.test(seg.toLowerCase())) break;   // "1080p"
+    if (FOLDER_NOISE[seg.toLowerCase().replace(/[\s._-]+/g, "")]) break;
+
+    var cleaned = cleanTitle(seg, null);
+    if (!isRealTitle(cleaned)) continue;
+    // "The Complete Series" cleans down to an article, which is no title.
+    if (/^(?:the|a|an|of|and|to|in|on|my|all|final|complete)$/i.test(cleaned)) continue;
+    out.title = cleaned;
+    break;   // the closest name to the file wins
+  }
+
+  return out.title ? out : null;
+}
+
 function parseFilename(url) {
   var fname = fileNameFromUrl(url);
   if (!fname) return null;
   var base = fname.replace(/\.[a-z0-9]{2,4}$/i, "");
+
+  // An IMDb id in the name identifies the title outright, so it is worth
+  // carrying: it replaces the whole title ladder with a single lookup. Some
+  // scene releases and most library rips include one.
+  var imdb = /(?:^|[^a-z0-9])(tt\d{7,8})(?:[^0-9]|$)/i.exec(fname);
+  var imdbId = imdb ? imdb[1].toLowerCase() : null;
+
   // Brackets usually hold the noise ("[1080p]", "[SubsPlease]") and would
   // otherwise defeat the end-anchored absolute-episode pattern.
   var stripped = base.replace(/\[[^\]]*\]/g, " ")
@@ -497,7 +615,33 @@ function parseFilename(url) {
                      .replace(/[._]+/g, " ")
                      .replace(/\s+/g, " ").trim();
   var code = parseEpisodeCode(stripped) || parseEpisodeCode(base);
-  var title = cleanTitle(base, code);
+
+  // A file called "05.mkv" holds an episode number with nothing in front of
+  // it, which the absolute-number pattern needs. Only one to three digits:
+  // "1917" is a film and must stay a title.
+  if (!code && /^\d{1,3}$/.test(stripped)) {
+    code = { season: 1, episode: parseInt(stripped, 10), extra: null, seasonFromName: false };
+  }
+
+  // The id is not part of the name, and leaving it in would pollute the title
+  // for the ladder in case the id lookup misses.
+  var title = cleanTitle(imdbId ? base.replace(imdb[0], " ") : base, code);
+  var hints = parseFolderHints(url);
+
+  if (hints) {
+    // The directory supplies a title when the filename has none to give, or
+    // when all it offers is a number or a placeholder word like "Episode".
+    if (!isRealTitle(title)) title = hints.title;
+    // …and a season, but only where the filename did not state one.
+    if (code && hints.season !== null && !code.seasonFromName) {
+      code = { season: hints.season, episode: code.episode, extra: code.extra, seasonFromName: false };
+    }
+  } else if (isPlaceholderTitle(title)) {
+    // Nothing to replace it with. Searching TMDB for "Episode" finds nothing
+    // worth showing, so the file is handed to the manual search instead.
+    title = "";
+  }
+
   if (!title || title.length < 2) return null;
 
   // A release year, which is how a film is told apart from a TV episode: no
@@ -514,8 +658,14 @@ function parseFilename(url) {
     year = parseInt(years[years.length - 1].replace(/[^\d]/g, ""), 10);
   }
 
+  // An IMDb id in the name identifies the title outright, so it is worth
+  // carrying: it replaces the whole title ladder with a single lookup. Some
+  // scene releases and most library rips include one.
+  var imdb = /(?:^|[^a-z0-9])(tt\d{7,8})(?:[^0-9]|$)/i.exec(fname);
+  var imdbId = imdb ? imdb[1].toLowerCase() : null;
+
   return {
-    fileName: fname, title: title, code: code, year: year,
+    fileName: fname, title: title, code: code, year: year, imdbId: imdbId,
     // No episode code but a year: almost certainly a film.
     isMovie: !code && !!year
   };
@@ -544,6 +694,48 @@ function titleCandidates(title) {
   return out.filter(function(s) {
     return !/^(the|a|an|of|and|to|in|on)$/i.test(s);
   });
+}
+
+// How well a result's name matches the query that found it, from 0 to 1.
+// TMDB's search is forgiving — a query carrying leftover noise happily
+// returns a show that merely starts the same way, and taking the highest
+// vote count then locks in the wrong series for the rest of the session.
+function titleScore(query, name) {
+  var q = normalizeForMatch(query), n = normalizeForMatch(name);
+  if (!q || !n) return 0;
+  if (q === n) return 1;
+  var qs = q.split(" "), ns = n.split(" ");
+  // The candidate is a prefix of the real title ("Severance" for "Severance:
+  // The Office"), which is what the ladder is designed to produce. Penalise
+  // only for how much extra name came back.
+  if (n.indexOf(q) === 0) return 0.9 - 0.1 * (ns.length - qs.length) / ns.length;
+  if (q.indexOf(n) === 0) return 0.85 - 0.1 * (qs.length - ns.length) / qs.length;
+  // Token overlap, so "Office US" still matches "The Office US" without the
+  // articles getting in the way.
+  var seen = {}, shared = 0, i;
+  for (i = 0; i < qs.length; i++) seen[qs[i]] = 1;
+  for (i = 0; i < ns.length; i++) if (seen[ns[i]]) shared++;
+  var union = qs.length + ns.length - shared;
+  return union ? shared / union : 0;
+}
+
+// Below this, the result does not look like the thing that was asked for, so
+// the ladder keeps descending instead of committing.
+var AUTO_MIN_SCORE = 0.6;
+// Below this, a result is unrelated and is not used even as a last resort.
+var AUTO_WEAK_SCORE = 0.34;
+
+function normalizeForMatch(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    // Leading articles vary between a filename and a TMDB name, so they are
+    // not part of the identity of the title.
+    .replace(/\b(the|a|an|of|and|to|in|on|with|for)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // ── Title treatment (TMDB "logos") ─────────────────────────────────
@@ -579,28 +771,35 @@ function pickLogo(images) {
   return best ? "https://image.tmdb.org/t/p/w780" + best.file_path : "";
 }
 
+// Turn a movie detail response into the shape saveSelection expects. Shared by
+// the ladder match and the IMDb lookup, which each fetch the detail themselves.
+function saveMovieDetail(d) {
+  if (!currentVideoUrl || !d || !d.title) { resetPanel(); return; }
+  saveSelection({
+    showTitle:  "Movie",
+    epTitle:    d.title,
+    code:       (d.release_date || "").slice(0, 4),
+    airDate:    d.release_date || "",
+    isStream:   false,
+    rating:     d.vote_average ? d.vote_average.toFixed(1) : "",
+    overview:   d.overview || "",
+    posterUrl:  d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
+    logoUrl:    pickLogo(d.images),
+    // A film has no season, but the key has to exist so the staleness check
+    // can tell an old entry from a film.
+    context:    "",
+    tmdbId:     String(d.id),
+    season:     null,
+    episode:    null,
+    isMovie:    true
+  });
+}
+
 // Turn a matched movie into the same shape saveSelection expects.
 function applyAutoMovie(item) {
   fetch("https://api.themoviedb.org/3/movie/" + item.id + "?api_key=" + TK + "&append_to_response=images")
     .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!currentVideoUrl || !d.title) { resetPanel(); return; }
-      saveSelection({
-        showTitle:  "Movie",
-        epTitle:    d.title,
-        code:       (d.release_date || "").slice(0, 4),
-        airDate:    d.release_date || "",
-        isStream:   false,
-        rating:     d.vote_average ? d.vote_average.toFixed(1) : "",
-        overview:   d.overview || "",
-        posterUrl:  d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
-        logoUrl:    pickLogo(d.images),
-        tmdbId:     String(item.id),
-        season:     null,
-        episode:    null,
-        isMovie:    true
-      });
-    })
+    .then(saveMovieDetail)
     .catch(function() { resetPanel(); });
 }
 
@@ -611,8 +810,9 @@ function autoIdentify(url) {
   var parsed = parseFilename(url);
   if (!parsed || !TK) return false;
   // Need an episode code, or a year to identify a film by. A name with
-  // neither is left for the manual search.
-  if (!parsed.code && !parsed.isMovie) return false;
+  // neither is left for the manual search — unless it carries an IMDb id,
+  // which is enough on its own to identify a film.
+  if (!parsed.code && !parsed.isMovie && !parsed.imdbId) return false;
   // Already searching this URL (sidebarReady re-emits fileChanged).
   if (autoInFlight[url]) return true;
   autoInFlight[url] = true;
@@ -623,6 +823,9 @@ function autoIdentify(url) {
     + htmlEsc(parsed.fileName) + '…</div>';
 
   var candidates = titleCandidates(parsed.title).slice(0, AUTO_MAX_TRIES);
+  // Best plausible match seen so far, kept so that a ladder which finds
+  // nothing better can still land instead of giving up.
+  var bestSeen = null;
 
   function giveUp(msg) {
     delete autoInFlight[url];
@@ -631,9 +834,19 @@ function autoIdentify(url) {
     panel.innerHTML = '<div class="msg">' + msg + '</div>';
   }
 
+  function commit(item) {
+    autoCancelTimer();
+    document.getElementById("q").value = item.title || item.name || "";
+    if (parsed.isMovie) applyAutoMovie(item);
+    else applyAutoMatch(item, parsed.code);
+  }
+
   // Try each candidate in turn; the first with results wins.
   function attempt(i) {
     if (i >= candidates.length) {
+      // Out of candidates. A weak earlier match still beats nothing, as long
+      // as it named something at all.
+      if (bestSeen && bestSeen.score >= AUTO_WEAK_SCORE) { commit(bestSeen.item); return; }
       giveUp("No match for " + htmlEsc(parsed.fileName) + " — search above.");
       return;
     }
@@ -667,20 +880,54 @@ function autoIdentify(url) {
           list = (data.results || [])
             .filter(function(x) { return x.media_type !== "movie" && x.name; });
           if (!list.length) return attempt(i + 1);
-          // Highest-voted result is nearly always the right show.
-          list.sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
-          pick = list[0];
+          // Rank by how well each result's name matches the candidate it came
+          // from, using votes only to break a tie between equally good names.
+          // Taking the highest-voted result outright is what let a show that
+          // merely shares a prefix win.
+          var ranked = list.map(function(x) {
+            return { item: x, score: titleScore(candidates[i], x.name || "") };
+          }).sort(function(a, b) {
+            if (b.score !== a.score) return b.score - a.score;
+            return (b.item.vote_count || 0) - (a.item.vote_count || 0);
+          });
+          if (!bestSeen || ranked[0].score > bestSeen.score) bestSeen = ranked[0];
+          // A poor name match means this candidate is still carrying noise,
+          // so try a shorter one rather than committing to the wrong show.
+          if (ranked[0].score < AUTO_MIN_SCORE && i + 1 < candidates.length) return attempt(i + 1);
+          pick = ranked[0].item;
         }
 
-        autoCancelTimer();
-        document.getElementById("q").value = pick.title || pick.name || "";
-        if (parsed.isMovie) applyAutoMovie(pick);
-        else applyAutoMatch(pick, parsed.code);
+        commit(pick);
       })
       .catch(function() {
         // A network failure will hit every candidate; don't hammer TMDB.
         giveUp("Lookup failed — search above.");
       });
+  }
+
+  // An IMDb id in the filename is a direct answer, so it is tried before the
+  // ladder: one request instead of up to AUTO_MAX_TRIES, and no chance of
+  // picking a same-prefixed show. A miss here is not fatal — the ladder still
+  // runs, so an id TMDB does not know costs one extra round trip and no
+  // behaviour.
+  function lookupImdb() {
+    // With no episode code there is nothing to select inside a season, so
+    // only a film can be resolved from the id alone.
+    var asMovie = !parsed.code;
+    var endpoint = asMovie ? "movie" : "tv";
+    return fetch("https://api.themoviedb.org/3/" + endpoint + "/find/" + parsed.imdbId
+      + "?api_key=" + TK + "&append_to_response=images")
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        delete autoInFlight[url];
+        if (currentVideoUrl !== url || autoTimerId === null) return false;
+        // An unknown id comes back as a 404 body with no id on it.
+        if (!d || !d.id) return false;
+        if (asMovie) { autoCancelTimer(); saveMovieDetail(d); return true; }
+        applyShowDetail(d, parsed.code);
+        return true;
+      })
+      .catch(function() { return false; });
   }
 
   autoTimerId = setTimeout(function() {
@@ -691,42 +938,60 @@ function autoIdentify(url) {
       + htmlEsc(parsed.fileName) + ' — search above.</div>';
   }, AUTO_SEARCH_MS);
 
-  attempt(0);
+  if (parsed.imdbId) {
+    lookupImdb().then(function(found) { if (!found) attempt(0); });
+  } else {
+    attempt(0);
+  }
   return true;
+}
+
+// Wire the picker to a full show detail object, whichever route produced it:
+// /tv/{id} after a ladder match, or /tv/find/{imdb_id} when the filename
+// carries an IMDb id. Both return the same shape.
+function applyShowDetail(show, code) {
+  if (!currentVideoUrl) return;
+  // A request that 404s still resolves, with a JSON body carrying no id. That
+  // is not a match, and returning quietly would strand the panel on
+  // "Matching…" — the give-up timer was already cancelled by the time we get
+  // here — so fall back to the search prompt instead.
+  if (!show || !show.id) { resetPanel(); return; }
+  selShow = show;
+  selShow._name = show.name;
+  selShow._seasons = (show.seasons || []).filter(function(s) { return s.season_number > 0; });
+  showLogoUrl = pickLogo(show.images);
+  showTotals = {
+    seasons: show.number_of_seasons || selShow._seasons.length || null,
+    episodes: show.number_of_episodes || null
+  };
+
+  // If the filename named a season the show doesn't have, fall back to
+  // the closest real one rather than failing outright.
+  var wanted = code.season;
+  var exists = selShow._seasons.some(function(s) { return s.season_number === wanted; });
+  if (!exists && wanted > 1) wanted = 1;
+  selSeason = wanted;
+
+  // Build the same panel shape a manual pick produces, so the season and
+  // episode pills stay available for a one-click correction.
+  var pills = "";
+  selShow._seasons.forEach(function(s) {
+    pills += '<button class="pill' + (wanted === s.season_number ? " on" : "") +
+      '" onclick="pickSeason(' + s.season_number + ')">S' +
+      String(s.season_number).padStart(2, "0") + '</button>';
+  });
+  document.getElementById("panel").innerHTML =
+    '<div class="sec"><div class="sl">Season</div><div class="pills">' + pills + '</div></div>' +
+    '<div id="ep"></div>';
+
+  renderEps(wanted, code.episode);
 }
 
 // Fetch the season list and select the parsed episode in one go.
 function applyAutoMatch(item, code) {
   fetch("https://api.themoviedb.org/3/tv/" + item.id + "?api_key=" + TK + "&append_to_response=images")
     .then(function(r) { return r.json(); })
-    .then(function(show) {
-      if (!currentVideoUrl) return;
-      selShow = item;
-      selShow._name = show.name;
-      selShow._seasons = (show.seasons || []).filter(function(s) { return s.season_number > 0; });
-      showLogoUrl = pickLogo(show.images);
-
-      // If the filename named a season the show doesn't have, fall back to
-      // the closest real one rather than failing outright.
-      var wanted = code.season;
-      var exists = selShow._seasons.some(function(s) { return s.season_number === wanted; });
-      if (!exists && wanted > 1) wanted = 1;
-      selSeason = wanted;
-
-      // Build the same panel shape a manual pick produces, so the season and
-      // episode pills stay available for a one-click correction.
-      var pills = "";
-      selShow._seasons.forEach(function(s) {
-        pills += '<button class="pill' + (wanted === s.season_number ? " on" : "") +
-          '" onclick="pickSeason(' + s.season_number + ')">S' +
-          String(s.season_number).padStart(2, "0") + '</button>';
-      });
-      document.getElementById("panel").innerHTML =
-        '<div class="sec"><div class="sl">Season</div><div class="pills">' + pills + '</div></div>' +
-        '<div id="ep"></div>';
-
-      renderEps(wanted, code.episode);
-    })
+    .then(function(show) { applyShowDetail(show, code); })
     .catch(function() {
       resetPanel();
     });
@@ -817,6 +1082,9 @@ function showSaved(info) {
   if (info.rating)  m.push('<span class="rat">&#9733; ' + htmlEsc(info.rating) + '</span>');
   document.getElementById("s-meta").innerHTML = m.join(" &nbsp;·&nbsp; ");
 
+  // Series context line, empty for a film.
+  document.getElementById("s-ctx").textContent = info.context || "";
+
   var desc    = info.overview || "";
   var descEl  = document.getElementById("s-desc");
   var moreBtn = document.getElementById("show-more");
@@ -859,6 +1127,7 @@ function doClear() {
   selSeason    = null;
   descExpanded = false;
   episodeCache = [];
+  showTotals   = null;
   iina.postMessage("clearEpisode", {});
   resetPanel();
 }
@@ -938,6 +1207,7 @@ function pickItem(item) {
   selSeason = null;
   episodeCache = [];
   showLogoUrl = "";
+  showTotals = null;
 
   if (item.media_type === "movie") {
     document.getElementById("panel").innerHTML =
@@ -952,6 +1222,7 @@ function pickItem(item) {
           overview:d.overview||"",
           posterUrl:d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
           logoUrl: pickLogo(d.images),
+          context: "",
           tmdbId: String(item.id), season: null, episode: null, isMovie: true };
         saveSelection(info);
       }).catch(function(){
@@ -968,6 +1239,10 @@ function pickItem(item) {
       selShow._name    = show.name;
       selShow._seasons = (show.seasons||[]).filter(function(s){return s.season_number>0;});
       showLogoUrl      = pickLogo(show.images);
+      showTotals       = {
+        seasons: show.number_of_seasons || selShow._seasons.length || null,
+        episodes: show.number_of_episodes || null
+      };
       renderSeasons();
     }).catch(function(){
       document.getElementById("panel").innerHTML='<div class="msg">Failed to load seasons.</div>';
@@ -1035,6 +1310,31 @@ function renderEps(sNum, autoEp) {
     }).catch(function(){ el.innerHTML='<div class="msg">Failed to load episodes.</div>'; });
 }
 
+function epCode(s, e) {
+  return "S" + String(s).padStart(2, "0") + "E" + String(e).padStart(2, "0");
+}
+
+// Where this episode sits, and when the next one is due. Both figures come
+// out of the season response the picker already fetched, so showing them costs
+// no extra round trip.
+function seriesContext(sNum, ep) {
+  var bits = [];
+  if (showTotals) {
+    bits.push("Season " + sNum + (showTotals.seasons ? " of " + showTotals.seasons : ""));
+  }
+  // Only claim a total when the episode really is inside it: a season that
+  // TMDB lists partially would otherwise render "Episode 3 of 2".
+  if (episodeCache.length && ep.episode_number <= episodeCache.length) {
+    bits.push("Episode " + ep.episode_number + " of " + episodeCache.length);
+  }
+  var i = episodeCache.indexOf(ep);
+  var next = i >= 0 ? episodeCache[i + 1] : null;
+  if (next) {
+    bits.push("Next " + epCode(sNum, next.episode_number) + (next.air_date ? " " + next.air_date : ""));
+  }
+  return bits.join("  ·  ");
+}
+
 // FIX: pickEp now takes an integer index, not an encoded JSON string.
 function pickEp(idx) {
   var ep = episodeCache[idx];
@@ -1043,7 +1343,8 @@ function pickEp(idx) {
     isStream:  false,
     showTitle: selShow._name||selShow.name||"",
     epTitle:   ep.name||("Episode "+ep.episode_number),
-    code:      "S"+String(selSeason).padStart(2,"0")+"E"+String(ep.episode_number).padStart(2,"0"),
+    code:      epCode(selSeason, ep.episode_number),
+    context:   seriesContext(selSeason, ep),
     airDate:   ep.air_date||"",
     rating:    ep.vote_average?ep.vote_average.toFixed(1):"",
     overview:  ep.overview||"",
@@ -1130,6 +1431,11 @@ iina.onMessage("fileChanged", function(d){
     // the refreshed entry always has the key, empty or not, and a title with
     // genuinely no logo refreshes only this one time.
     if (saved.logoUrl === undefined) stale = true;
+    // Same for the series context line, added later. Both writers now always
+    // store the key — a film stores an empty string, exactly as it does for
+    // logoUrl — so an absent key means only one thing: an entry written
+    // before the field existed.
+    if (saved.context === undefined) stale = true;
   }
 
   if (saved && !stale) {

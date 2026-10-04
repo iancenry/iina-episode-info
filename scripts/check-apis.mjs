@@ -142,10 +142,15 @@ async function checkTmdbRoutes() {
   const key = process.env.TMDB_API_KEY;
   const routes = [
     ["/3/search/multi", { query: TV.name }],
+    ["/3/search/tv", { query: TV.name }],
+    ["/3/search/movie", { query: MOVIE.name }],
     ["/3/configuration", {}],
     [`/3/tv/${TV.tmdb}`, {}],
     [`/3/tv/${TV.tmdb}/external_ids`, {}],
     [`/3/tv/${TV.tmdb}/season/1`, {}],
+    // The IMDb fast path: a filename carrying tt\d+ skips the title ladder.
+    [`/3/tv/find/${TV.imdb}`, {}],
+    [`/3/movie/find/${MOVIE.imdb}`, {}],
     [`/3/movie/${MOVIE.tmdb}`, {}],
     [`/3/movie/${MOVIE.tmdb}/external_ids`, {}],
   ];
@@ -178,14 +183,31 @@ async function checkTmdbShape() {
   need(ext.status === 200, `external_ids HTTP ${ext.status}`);
   need(ext.json?.imdb_id === TV.imdb, `external_ids.imdb_id was "${ext.json?.imdb_id}", expected ${TV.imdb}`);
 
-  // Season episodes feed the episode picker.
+  // Season episodes feed the episode picker, and the season's episode count and
+  // air dates now also feed the "Episode 3 of 10 · Next S02E04" context line.
   const season = await get(`https://api.themoviedb.org/3/tv/${TV.tmdb}/season/1?api_key=${key}`);
   need(season.status === 200, `season HTTP ${season.status}`);
   need(Array.isArray(season.json?.episodes) && season.json.episodes.length > 0, "season.episodes missing");
   const ep = season.json.episodes[0];
   need("episode_number" in ep && "name" in ep, "episode missing episode_number/name");
+  need("air_date" in ep, "episode missing air_date (the next-episode line reads it)");
 
-  return { detail: `search + external_ids (${TV.imdb}) + ${season.json.episodes.length} episodes all match` };
+  // The IMDb fast path. sidebar.html calls /find and treats a body with no id
+  // as a miss, so a shape change here would silently drop every file with an
+  // IMDb id back onto the title ladder.
+  const found = await get(`https://api.themoviedb.org/3/tv/find/${TV.imdb}?api_key=${key}`);
+  need(found.status === 200, `tv/find HTTP ${found.status}`);
+  need(found.json?.id === TV.tmdb, `tv/find.id was "${found.json?.id}", expected ${TV.tmdb}`);
+  need(Array.isArray(found.json?.seasons) && found.json.seasons.length > 0, "tv/find returned no seasons");
+  need("name" in found.json, "tv/find missing name");
+  // The season count drives the "Season 2 of 3" line.
+  need(typeof found.json?.number_of_seasons === "number", "tv/find missing number_of_seasons");
+
+  const foundMovie = await get(`https://api.themoviedb.org/3/movie/find/${MOVIE.imdb}?api_key=${key}`);
+  need(foundMovie.status === 200, `movie/find HTTP ${foundMovie.status}`);
+  need(foundMovie.json?.id === MOVIE.tmdb, `movie/find.id was "${foundMovie.json?.id}", expected ${MOVIE.tmdb}`);
+
+  return { detail: `search + find (${TV.imdb}) + external_ids (${TV.imdb}) + ${season.json.episodes.length} episodes all match` };
 }
 
 async function checkTmdbImages() {

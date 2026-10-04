@@ -145,6 +145,9 @@ function showOverlay(d) {
     airDate:     d.airDate    || "",
     rating:      d.rating     || "",
     overview:    d.overview   || "",
+    // Where the episode sits in its season and when the next lands. Empty for
+    // a film, which has no season.
+    context:     d.context    || "",
     posterUrl:   d.posterUrl  || "",
     // TMDB title treatment, when the title has one and it is wide enough to
     // be worth using. Empty string otherwise, and the overlay keeps text.
@@ -584,18 +587,40 @@ function stopTimeWatcher() {
   timeWatcher = null;
 }
 
+// The window title, the macOS media panel and IINA's playlist all read
+// mpv's media-title. Left alone, they show "Severance.S02E03.1080p.WEB-DL
+// .mkv"; set, they show what is actually playing.
+function setMediaTitle(info) {
+  if (!info) return;
+  var bits = [];
+  if (!info.isMovie && info.showTitle) bits.push(info.showTitle);
+  if (info.epTitle) bits.push(info.epTitle);
+  var title = bits.join(" — ");
+  if (!title) return;
+  try {
+    iina.mpv.set("media-title", title);
+  } catch (e) {
+    // Not worth surfacing: the only casualty is the window title.
+    log("media-title not set: " + errStr(e));
+  }
+}
+
 // ── Sidebar handlers ──────────────────────────────────────────
 function registerSidebarHandlers() {
 
   sidebar.onMessage("episodeSelected", function(info) {
     log("episodeSelected: " + (info ? info.epTitle : "null"));
     currentEpisode = info;
+    setMediaTitle(info);
     resolveSegments(info);
   });
 
   sidebar.onMessage("clearEpisode", function() {
     currentEpisode = null;
     segments = [];
+    // Hand the title back to mpv so the window stops claiming to know what is
+    // playing once the identification is discarded.
+    try { iina.mpv.set("media-title", ""); } catch(e) {}
     hideSkip();
     hideOverlay();
   });

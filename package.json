@@ -1,0 +1,9 @@
+{
+  "name": "iina-episode-info",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Test harness only. The plugin itself ships as plain files with no build step and no dependencies.",
+  "scripts": {
+    "test": "node --test 'tests/**/*.test.mjs'"
+  }
+}

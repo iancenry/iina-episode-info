@@ -34,7 +34,7 @@
     width:100%; position:relative;
     background:rgba(10,10,10,var(--bg-opacity));
     padding:28px 5%;
-    display:flex; align-items:center; gap:40px;
+    display:flex; align-items:center; gap:40px; flex-wrap:wrap;
   }
 
   /* ── Title treatment ──────────────────────────────────────────
@@ -73,6 +73,20 @@
   }
   .mt span+span::before { content:' · '; color:rgba(255,255,255,0.3); margin:0 6px; }
   .rat { color:#f5c518; font-weight:600; }
+  /* Series context: where this episode sits and when the next one lands.
+     Quieter than the meta row — it is reference, not the headline. */
+  .cx {
+    font-size:13px; color:rgba(255,255,255,0.4);
+    margin:-8px 0 14px; line-height:1.4;
+  }
+  .cx:empty { display:none; }
+  /* TMDB requires the notice to be shown wherever their data appears, which
+     includes this card rather than only the README. */
+  .attr {
+    flex:0 0 100%;
+    font-size:10px; color:rgba(255,255,255,0.28);
+    margin-top:4px; letter-spacing:.02em;
+  }
   .ov {
     font-size:16px; color:rgba(255,255,255,0.65);
     line-height:1.6;
@@ -183,10 +197,15 @@
       <div class="sn" id="show-name"></div>
       <div class="et" id="ep-title"></div>
       <div class="mt" id="meta-row"></div>
+      <div class="cx" id="ctx-row"></div>
       <div class="ov"  id="overview"></div>
     </div>
 
     <div id="poster"></div>
+
+    <!-- flex-basis 100% wraps this onto its own line inside the shaded card,
+         rather than letting it sit beside the poster. -->
+    <div class="attr" id="attr"></div>
   </div>
 </div>
 
@@ -281,6 +300,14 @@ iina.onMessage("showData", function(d) {
   if (d.airDate) parts.push("<span>" + esc(d.airDate) + "</span>");
   if (d.rating)  parts.push('<span class="rat">&#9733; ' + esc(d.rating) + "</span>");
   document.getElementById("meta-row").innerHTML = parts.join("");
+
+  // Series context, empty for a film.
+  document.getElementById("ctx-row").textContent = d.context || "";
+
+  // TMDB's required attribution, shown on the card because that is where their
+  // data is displayed.
+  document.getElementById("attr").textContent =
+    "Data from TMDB. Not endorsed or certified by TMDB.";
 
   // Overview
   document.getElementById("overview").textContent = d.overview || "";
