@@ -9,3 +9,8 @@
 # Build output
 *.iinaplgz
 node_modules/
+
+# Local working notes and agent config — machine-specific, not project
+# content. Both still work from disk; they're just not published.
+NOTES.md
+AGENTS.md
