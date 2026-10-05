@@ -6,7 +6,30 @@ Optionally, one-click skipping of intros and credits.
 No searching, no picking a season, no picking an episode. Open a file and the
 card is already there.
 
+<!--
+SCREENSHOTS
+
+Every image slot in this file is an HTML comment, so the README reads correctly
+with none of them filled in. To add one:
+
+  1. Put the file in docs/images/, named as below. PNG, not JPG: the card has
+     large flat areas of dark grey where JPG rings.
+  2. Uncomment the block and delete the surrounding <!-- and -->.
+  3. Keep the alt text. It is what a screen reader gets, and it is the only
+     thing left if the image 404s.
+
+Crop tight to the thing being shown. A full window screenshot of IINA says
+nothing about the plugin; a card with the video behind it says everything.
+-->
+
 ## What it does
+
+<!--
+<img src="docs/images/card-episode.png" alt="The episode card over the video, showing Severance S02E03: the title treatment, the episode title, air date, rating and a line of season context." width="640">
+
+Paused mid-episode: the card is already there, because the filename was read on
+open rather than after you paused.
+-->
 
 ### Identifies the file itself
 
@@ -57,6 +80,13 @@ forgets it again.
 Automatic matches never write a pin. Only a pick you made yourself counts as
 agreement, so one bad guess cannot quietly take over a whole folder.
 
+<!--
+<img src="docs/images/sidebar.png" alt="The Episode Info sidebar tab: the API key field, the identified card for the current file, season and episode pills, and the search box." width="480">
+
+The sidebar is where identification is shown and overridden. The pills are the
+manual correction for a filename the plugin read wrongly.
+-->
+
 ### Shows where you are in the season
 
 The card carries a line of context: which season and episode this is, and when
@@ -65,6 +95,13 @@ the next one airs.
 ```
 Season 2 of 2  ·  Episode 3 of 3  ·  Next S02E04 2025-03-07
 ```
+
+<!--
+<img src="docs/images/card-film.png" alt="A film card over the video: the title treatment standing in for the title, with the rating, release date and overview." width="640">
+
+A film is identified by its release year rather than an episode code, and the
+wordmark replaces the title entirely rather than sitting above it.
+-->
 
 ### Uses the title treatment
 
@@ -80,6 +117,12 @@ non-English is rejected, and the rest fall back to text.
 
 It costs no extra round trip. The images sub-resource is folded into the detail
 request already being made, with `append_to_response=images`.
+
+<!--
+<img src="docs/images/themes.png" alt="The card in three themes: Classic with a poster backdrop, Compact without one, and Poster dominated by the artwork." width="640">
+
+Classic, Compact and Poster, under Overlay controls in the sidebar.
+-->
 
 ### Names what is playing
 
@@ -177,6 +220,12 @@ that agree. Coverage is good for popular shows and thin for new or niche ones.
 **Search again** asks the databases for a fresh answer, even for a file whose
 chapters already answered it. If the databases have nothing, the chapters stand:
 you cannot lose a working pill by pressing it.
+
+<!--
+<img src="docs/images/skip-pill.png" alt="A Skip Intro button in the bottom-right of the video, appearing as playback reaches the opening." width="480">
+
+The pill only appears inside a segment, and only while the video is playing.
+-->
 
 ## Privacy
 
