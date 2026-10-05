@@ -6,11 +6,10 @@ Optionally, one-click skipping of intros and credits.
 No searching, no picking a season, no picking an episode. Open a file and the
 card is already there.
 
-<!--
-SCREENSHOTS
-
-Every image slot in this file is an HTML comment, so the README reads correctly
-with none of them filled in. To add one:
+All five slots are filled: card-episode.png, sidebar.png, skip-pill.png,
+card-film.png and themes.png. Every image slot in this file started as an HTML
+comment, so the README read correctly with none of them in place. To add
+another:
 
   1. Put the file in docs/images/, named as below. PNG, not JPG: the card has
      large flat areas of dark grey where JPG rings.
@@ -20,12 +19,6 @@ with none of them filled in. To add one:
 
 Crop tight to the thing being shown. A full window screenshot of IINA says
 nothing about the plugin; a card with the video behind it says everything.
-
-Done: card-episode.png, sidebar.png, skip-pill.png. Still to shoot:
-card-film.png (a film, where the wordmark replaces the title outright) and
-themes.png (the three themes side by side).
--->
-
 ## What it does
 
 <img src="docs/images/card-episode.png" alt="The episode card over the video for Lanterns S01E08: the wordmark, the episode title, the code, air date and rating, a line of season context, the overview, and the poster." width="640">
@@ -98,12 +91,10 @@ the next one airs.
 Season 2 of 2  ·  Episode 3 of 3  ·  Next S02E04 2025-03-07
 ```
 
-<!--
 <img src="docs/images/card-film.png" alt="A film card over the video: the title treatment standing in for the title, with the rating, release date and overview." width="640">
 
 A film is identified by its release year rather than an episode code, and the
 wordmark replaces the title entirely rather than sitting above it.
--->
 
 ### Uses the title treatment
 
@@ -120,11 +111,9 @@ non-English is rejected, and the rest fall back to text.
 It costs no extra round trip. The images sub-resource is folded into the detail
 request already being made, with `append_to_response=images`.
 
-<!--
-<img src="docs/images/themes.png" alt="The card in three themes: Classic with a poster backdrop, Compact without one, and Poster dominated by the artwork." width="640">
+<img src="docs/images/themes.png" alt="The same card in three themes: Classic with the text on the left and the poster on the right, Compact reduced to a single line with no poster or synopsis, and Poster leading with the artwork beside a fuller synopsis." width="640">
 
 Classic, Compact and Poster, under Overlay controls in the sidebar.
--->
 
 ### Names what is playing
 
@@ -283,6 +272,10 @@ the full wording is reproduced here.
 Skip-intro timings come from IntroDB, TheIntroDB, SkipDB and
 [AniSkip](https://aniskip.com), which are independent community services with
 no affiliation to this plugin or to TMDB.
+
+Inspiration for the filename-parsing approach, and the reason the season and
+episode arithmetic in `locateAbsolute` is written the way it is, came from
+Zain Imam's work on the same problem.
 
 ## Licence
 
