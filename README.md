@@ -20,16 +20,18 @@ with none of them filled in. To add one:
 
 Crop tight to the thing being shown. A full window screenshot of IINA says
 nothing about the plugin; a card with the video behind it says everything.
+
+Done: card-episode.png, sidebar.png, skip-pill.png. Still to shoot:
+card-film.png (a film, where the wordmark replaces the title outright) and
+themes.png (the three themes side by side). See docs/SHOTS.md.
 -->
 
 ## What it does
 
-<!--
-<img src="docs/images/card-episode.png" alt="The episode card over the video, showing Severance S02E03: the title treatment, the episode title, air date, rating and a line of season context." width="640">
+<img src="docs/images/card-episode.png" alt="The episode card over the video for Lanterns S01E08: the wordmark, the episode title, the code, air date and rating, a line of season context, the overview, and the poster." width="640">
 
 Paused mid-episode: the card is already there, because the filename was read on
 open rather than after you paused.
--->
 
 ### Identifies the file itself
 
@@ -80,12 +82,12 @@ forgets it again.
 Automatic matches never write a pin. Only a pick you made yourself counts as
 agreement, so one bad guess cannot quietly take over a whole folder.
 
-<!--
-<img src="docs/images/sidebar.png" alt="The Episode Info sidebar tab: the API key field, the identified card for the current file, season and episode pills, and the search box." width="480">
+<img src="docs/images/sidebar.png" alt="The Episode Info sidebar tab: the overlay toggle, the identified episode with its overview, the Remember this folder checkbox, the API key state, the search box, recent searches, recent picks, and the shade, position, theme and delay controls." width="380">
 
-The sidebar is where identification is shown and overridden. The pills are the
-manual correction for a filename the plugin read wrongly.
--->
+Everything lives here: what the plugin worked out, the folder pin, recent
+searches and picks, and the appearance controls. When it reads a filename
+wrongly, the panel below the search box replaces itself with season and episode
+pills to correct it.
 
 ### Shows where you are in the season
 
@@ -221,11 +223,10 @@ that agree. Coverage is good for popular shows and thin for new or niche ones.
 chapters already answered it. If the databases have nothing, the chapters stand:
 you cannot lose a working pill by pressing it.
 
-<!--
-<img src="docs/images/skip-pill.png" alt="A Skip Intro button in the bottom-right of the video, appearing as playback reaches the opening." width="480">
+<img src="docs/images/skip-pill.png" alt="A Skip Intro button in the bottom-right corner of the video, appearing as playback reaches the opening." width="480">
 
-The pill only appears inside a segment, and only while the video is playing.
--->
+The pill only appears inside a segment, and only while the video is playing. It
+never seeks on its own.
 
 ## Privacy
 
