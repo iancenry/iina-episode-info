@@ -1,5 +1,5 @@
 {
-  "name": "Episode Info",
+  "name": "Sidekick",
   "identifier": "com.iancenry.sidekick",
   "version": "1.4.0",
   "ghRepo": "iancenry/iina-sidekick",
@@ -24,6 +24,6 @@
     "api.aniskip.com"
   ],
   "sidebarTab": {
-    "name": "Episode Info"
+    "name": "Sidekick"
   }
 }

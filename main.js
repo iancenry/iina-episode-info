@@ -1,5 +1,5 @@
 // ============================================================
-// IINA Plugin: Episode Info  @version 1.4.0
+// IINA Plugin: Sidekick  @version 1.4.0
 // The version is kept in step with Info.json and package.json by a CI check.
 // Machine-readable on purpose: the check reads this line, and a header written
 // for humans had drifted once already (1.3.1 in a 1.4.0 build, so a bug report

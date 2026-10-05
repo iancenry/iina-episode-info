@@ -1,4 +1,4 @@
-# Episode Info
+# Sidekick
 
 **Episode and movie info from TMDB, on the video the moment you pause. Automatically.**
 Optionally, one-click skipping of intros and credits.
@@ -75,7 +75,7 @@ forgets it again.
 Automatic matches never write a pin. Only a pick you made yourself counts as
 agreement, so one bad guess cannot quietly take over a whole folder.
 
-<img src="docs/images/sidebar.png" alt="The Episode Info sidebar tab: the overlay toggle, the identified episode with its overview, the Remember this folder checkbox, the API key state, the search box, recent searches, recent picks, and the shade, position, theme and delay controls." width="380">
+<img src="docs/images/sidebar.png" alt="The Sidekick sidebar tab: the overlay toggle, the identified episode with its overview, the Remember this folder checkbox, the API key state, the search box, recent searches, recent picks, and the shade, position, theme and delay controls." width="380">
 
 Everything lives here: what the plugin worked out, the folder pin, recent
 searches and picks, and the appearance controls. When it reads a filename
@@ -174,7 +174,7 @@ without publishing, but it will not self-update.
 
 1. Open IINA → Preferences → Plugins, install the plugin.
 2. Open the sidebar (⇧⌘V, or **Video → Show Video Panel**).
-3. Select the **Episode Info** tab.
+3. Select the **Sidekick** tab.
 4. Paste your TMDB key into the orange **"TMDB API Key Required"** box and press Save.
 
 The key is stored in the sidebar WebView's `localStorage` and is only ever sent

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Episode Info API health check.
+// Sidekick API health check.
 //
 // Verifies that every service the plugin depends on still behaves the way
 // main.js and sidebar.html expect. Exits 0 when everything is intact, 1 when
@@ -352,7 +352,7 @@ const fromDotEnv = loadDotEnv();
 const KEY_NAMES = ["TMDB_API_KEY"];
 const configured = KEY_NAMES.filter((k) => process.env[k]);
 
-console.log("Episode Info API health check");
+console.log("Sidekick API health check");
 if (fromDotEnv !== false) {
   console.log(`Loaded .env (${fromDotEnv} key${fromDotEnv === 1 ? "" : "s"} set)`);
 }
