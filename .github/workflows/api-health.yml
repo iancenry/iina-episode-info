@@ -10,8 +10,10 @@ on:
   push:
     paths:
       - "main.js"
+      - "sidebar.html"
+      - "overlay.html"
       - "Info.json"
-      - "scripts/check-apis.mjs"
+      - "scripts/**"
       - ".github/workflows/api-health.yml"
 
 permissions:
@@ -47,12 +49,27 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            // The label has to exist before anything is filed under it. GitHub
+            // drops labels it does not recognise on create, and the two list
+            // calls below filter on it: with no such label in the repo every
+            // failed run filed a brand new issue and the "close it once
+            // everything passes" step found nothing to close.
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner, repo: context.repo.repo,
+                name: 'api-health', color: 'd93f0b',
+                description: 'Opened automatically by the daily API health check.',
+              });
+            } catch (e) {
+              if (e.status !== 422) throw e;   // already exists
+            }
+
             const title = '🔴 API health check is failing';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
               `The daily API health check failed on ${new Date().toISOString().slice(0, 10)}.`,
               '',
-              `**[See which check failed and why](${runUrl})** — the run summary lists every endpoint with a pass/fail and the exact error.`,
+              `**[See which check failed and why](${runUrl})**. The run summary lists every endpoint with a pass/fail and the exact error.`,
               '',
               'Something the plugin depends on has changed: an endpoint moved, a response shape changed, or a key was revoked.',
               'This issue closes itself automatically once the check passes again.',
@@ -67,7 +84,7 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner, repo: context.repo.repo,
                 issue_number: existing.data[0].number,
-                body: `Still failing — [latest run](${runUrl})`,
+                body: `Still failing. [Latest run](${runUrl})`,
               });
             } else {
               await github.rest.issues.create({
@@ -89,7 +106,7 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner, repo: context.repo.repo,
                 issue_number: issue.number,
-                body: '✅ All APIs are healthy again — closing.',
+                body: '✅ All APIs are healthy again, closing.',
               });
               await github.rest.issues.update({
                 owner: context.repo.owner, repo: context.repo.repo,

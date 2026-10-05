@@ -116,13 +116,18 @@ test("a cached entry that disagrees with the filename is re-identified", async (
   const url = "file:///Users/me/Videos/Severance.S02E03.mkv";
   await identify(h, url);
 
-  // Same URL, but the cache now claims a different episode — the filename is
+  // Same URL, but the cache now claims a different episode. The filename is
   // ground truth, so the stale entry must be replaced rather than replayed.
   const map = JSON.parse(h.localStorage.getItem("epinfo_url_map"));
   map[url].episode = 1;
   map[url].code = "S02E01";
   h.localStorage.setItem("epinfo_url_map", JSON.stringify(map));
 
+  // Come back to the file the way a playlist does: play something else in
+  // between. A repeat of fileChanged for the file already playing is now a
+  // deliberate no-op, so it cannot stand in for "the user returned".
+  h.iina._emit("fileChanged", { url: "file:///v/Some Other Film 2019.mkv" });
+  await settle();
   const before = h.fetchCalls.length;
   h.iina._emit("fileChanged", { url });
   await settle();
@@ -136,4 +141,27 @@ test("every request goes to a host declared in Info.json", async () => {
   for (const path of requestedPaths(h.fetchCalls)) {
     assert.match(path, /^\/3\//, `unexpected request path: ${path}`);
   }
+});
+test("a film is chosen by how well its name matches, not by votes alone", async () => {
+  // Sorting a film on votes and the year picked "Star Wars" for
+  // "Star.Wars.Episode.IV.-.A.New.Hope.1977": both are 1977, and the shorter
+  // title has more votes. The name has to be the first thing ranked on.
+  const h = boot({
+    routes: {
+      "/3/search/movie": {
+        results: [
+          { id: 1, title: "Star Wars", release_date: "1977-05-25", vote_count: 20000 },
+          { id: 2, title: "Star Wars: Episode IV - A New Hope", release_date: "1977-05-25", vote_count: 12000 }
+        ]
+      },
+      "/3/movie/2": {
+        title: "Star Wars: Episode IV - A New Hope", release_date: "1977-05-25", images: {}
+      }
+    }
+  });
+  await identify(h, "file:///Users/me/Videos/Star.Wars.Episode.IV.-.A.New.Hope.1977.1080p.BluRay.x264-SPARKS.mkv");
+  const info = episodeSelected(h);
+  assert.ok(info, "no film was selected");
+  assert.equal(info.epTitle, "Star Wars: Episode IV - A New Hope",
+    "the higher-voted title won despite matching the name less well");
 });

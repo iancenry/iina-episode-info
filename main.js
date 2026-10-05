@@ -1,8 +1,12 @@
 // ============================================================
-// IINA Plugin: Episode Info  v1.3.1
+// IINA Plugin: Episode Info  @version 1.4.0
+// The version is kept in step with Info.json and package.json by a CI check.
+// Machine-readable on purpose: the check reads this line, and a header written
+// for humans had drifted once already (1.3.1 in a 1.4.0 build, so a bug report
+// naming 1.3.1 was really 1.4.0).
 // ============================================================
 
-const { core, event, overlay, sidebar, utils, file, menu } = iina;
+const { core, event, overlay, sidebar, menu } = iina;   // utils and file were never used
 
 // ── Helpers ──────────────────────────────────
 // Convert any thrown value / API error payload into a readable string.
@@ -24,16 +28,26 @@ function errStr(e) {
 
 // Race an HTTP promise against a timeout so search never hangs forever.
 function withTimeout(p, ms, label) {
+  var timer = null;
   return Promise.race([
     p,
     new Promise(function(_, reject) {
-      setTimeout(function() {
+      timer = setTimeout(function() {
         reject(new Error((label || "Request") + " timed out after " + Math.round(ms/1000) + "s"));
       }, ms);
     })
-  ]);
+  ]).then(function (v) {
+    // Disarm on the fast path. Every call used to leave its timeout armed, so
+    // one identification kept up to seven timers alive to fire at nothing ten
+    // seconds later.
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+    return v;
+  }, function (e) {
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+    throw e;
+  });
 }
-var HTTP_TIMEOUT_MS = 10000; // Per-call budget — sidebar enforces total budget
+var HTTP_TIMEOUT_MS = 10000; // Per-call budget; the sidebar enforces the total
 
 
 // ── Lazy IMDB ID resolver ───────────────────────────
@@ -100,7 +114,7 @@ async function resolveImdbIds(d, tmdbKey) {
 }
 
 
-// The canonical IMDB id, leading zeros intact — that is the form the skip
+// The canonical IMDB id, leading zeros intact. That is the form the skip
 // databases key on: tt0773262 returns Dexter's intro, tt773262 returns
 // nothing at all.
 function canonicalImdb(s) {
@@ -114,6 +128,9 @@ function canonicalImdb(s) {
 var sidebarLoaded      = false;
 var currentEpisode     = null;
 var pauseTimer         = null;
+// When playback last paused. The delay is counted from the pause, so a lookup
+// that lands late does not restart the countdown.
+var pausedAt           = 0;
 var overlayVisible     = false;
 var overlayBgOpacity   = 0.72;
 var overlayEnabled     = true;   // toggled from sidebar, persisted in sidebar's localStorage
@@ -166,6 +183,10 @@ function showOverlay(d) {
 
 function hideOverlay() {
   if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+  // Hiding resets the stamp: a pause the user has already spent time on must
+  // not count towards the next card. This is what keeps a new file, and a
+  // dismissed card, from inheriting the previous pause's elapsed time.
+  pausedAt = 0;
   cardVisible = false;
   overlayVisible = false;
   overlay.postMessage("hideCard", {});
@@ -195,8 +216,11 @@ var SEGMENT_LABELS = {
 
 // Crowdsourced data contains reversed and zero-length ranges.
 function validSegment(seg) {
-  return seg && isFinite(seg.start) && isFinite(seg.end) &&
-         seg.end > seg.start && seg.end - seg.start >= 3;
+  // Strictly boolean. This is a predicate and is used as one in filters, and
+  // it used to hand back whatever falsy value it was given, so `validSegment(x)
+  // === false` did not hold.
+  return !!(seg && isFinite(seg.start) && isFinite(seg.end) &&
+            seg.end > seg.start && seg.end - seg.start >= 3);
 }
 
 function pushSegment(list, kind, start, end, source, opts) {
@@ -210,19 +234,33 @@ function pushSegment(list, kind, start, end, source, opts) {
   if (validSegment(seg)) list.push(seg);
 }
 
-// 1. Chapters — no network, no coverage problem.
+// 1. Chapters. No network, no coverage problem.
 // Chapter has `start` but no `end`: a chapter ends where the next one begins.
+function fileDuration() {
+  // core.status.duration is null until the file is loaded, and getNumber
+  // answers 0 in the meantime. Both are asked, and 0 is a real answer for an
+  // unknown duration, so callers must treat it as "not known yet".
+  try {
+    var d = core.status.duration;
+    if (d) return d;
+  } catch (e) {}
+  try { return iina.mpv.getNumber("duration") || 0; } catch (e) { return 0; }
+}
+
 function segmentsFromChapters() {
   var out = [];
   try {
     var chapters = core.getChapters() || [];
     if (chapters.length < 2) return out;
-    var duration = 0;
-    try { duration = iina.mpv.getNumber("duration") || 0; } catch(e) {}
+    var duration = fileDuration();
 
     for (var i = 0; i < chapters.length; i++) {
       var title = String(chapters[i].title || "").trim();
-      var end   = (i + 1 < chapters.length) ? chapters[i + 1].start : duration;
+      // Last chapter has no successor, so it ends with the file. getNumber returns
+  // 0 until metadata has arrived and there is no other number to ask for, and
+  // `if (!end) continue` then dropped the final "Credits" chapter outright.
+  // Duration + 1 is only used as a last resort, and every consumer clamps it.
+  var end = (i + 1 < chapters.length) ? chapters[i + 1].start : (duration || (fileDuration() + 1));
       if (!end) continue;
       if (/^(op|opening|intro|avant|titles?|opening credits)$/i.test(title)) {
         pushSegment(out, "intro", chapters[i].start, end, "chapters");
@@ -259,13 +297,13 @@ async function segmentsFromApis(imdbId, season, episode) {
   }
 
   await Promise.all([
-    // IntroDB — /segments returns every type; /intro is intros-only.
+    // IntroDB: /segments returns every type, /intro is intros-only.
     grab("IntroDB", "https://api.introdb.app/segments?" + qs, function(b) {
       ["intro", "recap", "outro"].forEach(function(k) {
         if (b[k]) pushSegment(out, k, b[k].start_sec, b[k].end_sec, "introdb");
       });
     }),
-    // TheIntroDB — arrays, and start_ms/end_ms may be null meaning
+    // TheIntroDB: arrays, and start_ms/end_ms may be null meaning
     // "from the beginning" / "to the end of the file".
     grab("TheIntroDB", "https://api.theintrodb.org/v2/media?" + qs, function(b) {
       var dur = 0;
@@ -283,7 +321,7 @@ async function segmentsFromApis(imdbId, season, episode) {
         });
       });
     }),
-    // SkipDB — 200 with null members when it has nothing.
+    // SkipDB: 200 with null members when it has nothing.
     grab("SkipDB", "https://api.skipdb.tv/api/segments?" + qs, function(b) {
       var segs = b.segments || {};
       ["intro", "recap", "outro", "preview"].forEach(function(k) {
@@ -355,6 +393,10 @@ function overlapRatio(a, b) {
 }
 
 function median(nums) {
+  // Never called with an empty list today, but an empty one returned NaN, and
+  // this value becomes a segment's end time, where NaN would compare false
+  // everywhere and silently disable the skip pill rather than fail loudly.
+  if (!nums || !nums.length) return 0;
   var a = nums.slice().sort(function(x, y) { return x - y; });
   var m = Math.floor(a.length / 2);
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
@@ -408,7 +450,7 @@ function mergeSegments(list) {
     if (!starts.length) starts = win.map(function(s) { return s.start; });
     if (!ends.length)   ends   = win.map(function(s) { return s.end;   });
 
-    return {
+    var merged = {
       kind:    kind,
       // Earliest start, so the button is up before the intro rolls.
       start:   Math.min.apply(null, starts),
@@ -418,49 +460,124 @@ function mergeSegments(list) {
       sources: distinctSources(win),
       agreed:  distinctSources(win).length
     };
-  }).filter(validSegment);
+    // A disagreement between sources can merge into something too short to be
+    // real ("intro 51.2-54.2" with "intro 36-53.2" lands on 51.2-53.7, under
+    // three seconds). The estimate is dropped in favour of one source's own
+    // answer rather than the whole kind disappearing: a mediocre pill beats no
+    // pill, and only the members that are valid themselves are considered.
+    if (validSegment(merged)) return merged;
+    var usable = win.filter(validSegment);
+    if (!usable.length) return null;
+    var pick = usable.slice().sort(function(a, b) { return bestRank(a) - bestRank(b); })[0];
+    return {
+      kind: pick.kind, start: pick.start, end: pick.end,
+      sources: [pick.source], agreed: 1
+    };
+  }).filter(Boolean);
 }
 
+// Bumped whenever the answer must be abandoned: a new file, a cleared
+// selection, or skip intro being switched off. resolveSegments awaits network
+// calls that can take the best part of 30 seconds, and a run that finishes
+// after the user has moved on used to install its segments, restart the time
+// observer and show a skip pill for the episode that was playing before.
+var loadSeq = 0;
+
+// A run that is abandoned still has to answer, because the sidebar disables
+// "Search again" while it waits and re-enables it only on this message. Every
+// !live() return used to skip it, which left the button stuck on "Searching…"
+// for the rest of the session: nothing re-renders it.
 async function resolveSegments(info, forceRefresh) {
+  try {
+    await resolveSegmentsInner(info, forceRefresh);
+  } catch (e) {
+    // Every call site is fire-and-forget, so a throw here would be an unhandled
+    // rejection and no skipResult would ever be posted: the button would sit on
+    // "Searching…" for the rest of the session.
+    log("skip lookup failed: " + errStr(e));
+  }
+}
+
+async function resolveSegmentsInner(info, forceRefresh) {
+  var seq = ++loadSeq;
+  function live() { return seq === loadSeq; }
+  // Reported once, whichever way this run ends: either it installed an answer,
+  // or it was superseded and the sidebar needs telling that nothing is coming.
+  var reported = false;
+  function report(list, stale) {
+    if (reported) return;
+    reported = true;
+    reportSkip(info, list, stale);
+  }
+  // Stale, not empty. The sidebar clears its "Searching…" button on this
+  // message, and also prints what it is told; a superseded run reporting "no
+  // segments" made the sidebar say the episode had none and then swallow the
+  // real answer behind it.
+  function abandoned() { report([], true); }
+
   segments = [];
   activeSegment = null;
   hideSkip();
   if (!skipEnabled || !info) return;
 
   var local = segmentsFromChapters();
-  if (local.length) {
-    segments = mergeSegments(local);
+  // Chapters are the best answer available for most files, and they are free.
+  // A forced refresh still asks the databases, because the user asked for
+  // another answer: "Search again" checked the cache below and never got here,
+  // so for any file that ships chapter markers the button did nothing at all.
+  //
+  // But it does not replace them. The chapter answer is kept as the fallback:
+  // the databases have nothing for most episodes, and reporting "nothing found"
+  // while a working pill was thrown away is a worse answer than the one the
+  // user already had.
+  var chapterAnswer = local.length ? mergeSegments(local) : null;
+  if (chapterAnswer && !forceRefresh) {
+    segments = chapterAnswer;
     startTimeWatcher();
-    reportSkip(info, segments);
+    report(segments);
     return;
   }
 
-  // Keyed on the SHOW's IMDB id. The episode-level id the subtitle search
-  // caches must never be used here — it returns nothing.
+  // Keyed on the SHOW's IMDB id. The episode-level id is cached too, and must
+  // never be used here: it is the right key for one episode and returns nothing
+  // for every other, which looks exactly like "no intros found".
   function showLevelId() {
     return canonicalImdb(info.isMovie ? info.imdbId : info.parentImdbId);
   }
   var imdb = showLevelId();
   if (!imdb && tmdbKey && info.tmdbId) {
     await resolveImdbIds(info, tmdbKey);
+    if (!live()) { abandoned(); return; }
     imdb = showLevelId();
   }
-  if (!imdb) { reportSkip(info, []); return; }
+  // No second liveness check here: the line above is synchronous, so nothing
+  // can have invalidated this run since the check inside the await block.
+  if (!imdb) { report([]); return; }
 
   var cacheKey = imdb + ":" + (info.season || 0) + ":" + (info.episode || 0);
   if (segmentCache[cacheKey] && !forceRefresh) {
     segments = segmentCache[cacheKey];
     if (segments.length) startTimeWatcher();
-    reportSkip(info, segments);
+    report(segments);
     return;
   }
 
   // Anime first when it applies: AniSkip has native anime ids and is more
   // precise than the crowdsourced TV databases for openings and endings.
-  var mal = await malIdFor(imdb, info.season);
-  var anime = mal ? await segmentsFromAniSkip(mal, info.episode) : [];
+  //
+  // Started alongside the TV databases rather than before them. They were
+  // sequential, so every non-anime title sat through the whole ARM budget
+  // before a single community database was contacted.
+  var malPromise = malIdFor(imdb, info.season);
+  var remotePromise = segmentsFromApis(imdb, info.season, info.episode);
 
-  var remote = await segmentsFromApis(imdb, info.season, info.episode);
+  var mal = await malPromise;
+  if (!live()) { abandoned(); return; }
+  var anime = mal ? await segmentsFromAniSkip(mal, info.episode) : [];
+  if (!live()) { abandoned(); return; }
+
+  var remote = await remotePromise;
+  if (!live()) { abandoned(); return; }
   var merged = mergeSegments(remote);
 
   // A kind found by AniSkip wins; anything it did not cover falls back to the
@@ -471,29 +588,55 @@ async function resolveSegments(info, forceRefresh) {
     merged.forEach(function(x) { if (!byKind[x.kind]) byKind[x.kind] = x; });
     merged = Object.keys(byKind).map(function(k) { return byKind[k]; });
   }
+  // The databases had nothing to say, so the chapters still stand.
+  if (!merged.length && chapterAnswer) merged = chapterAnswer;
   segments = merged;
-  segmentCache[cacheKey] = segments;
+  // An empty answer is not cached. [] is truthy, so one outage or one provider
+  // hiccup would have pinned the episode to "nothing found" for the session,
+  // with only "Search again" able to clear it.
+  if (segments.length) {
+    rememberSegments(cacheKey, segments);
+  }
   if (segments.length) startTimeWatcher();
-  reportSkip(info, segments);
+  report(segments);
 }
 
 // Lets the sidebar's "Search again" button stop spinning and report.
-function reportSkip(info, list) {
+// The cache is bounded because nothing else is: one entry per episode watched,
+// held for the whole session, and a long evening adds hundreds. Oldest entries
+// go first, and the cap is deliberately far above a normal viewing session, so
+// the eviction only ever runs for someone who has left it playing.
+var SEGMENT_CACHE_MAX = 400;
+
+function rememberSegments(key, list) {
+  segmentCache[key] = list;
+  var keys = Object.keys(segmentCache);
+  if (keys.length > SEGMENT_CACHE_MAX) {
+    keys.slice(0, keys.length - SEGMENT_CACHE_MAX).forEach(function(k) {
+      delete segmentCache[k];
+    });
+  }
+}
+
+function reportSkip(info, list, stale) {
   sidebar.postMessage("skipResult", {
     count: list.length,
-    label: list.length ? describeSegments(list) : ""
+    label: list.length ? describeSegments(list) : "",
+    // This run was abandoned, not answered. The sidebar re-enables its button
+    // on it and leaves its status line alone.
+    stale: !!stale
   });
 }
 
-var SOURCE_NAMES = {
-  chapters:   "chapters",
-  introdb:    "IntroDB",
-  theintrodb: "TheIntroDB",
-  skipdb:     "SkipDB"
-};
 
 function fmtTime(sec) {
   var m = Math.floor(sec / 60), ss = Math.floor(sec % 60);
+  // Hours, once there are any. Without this a 62-minute credits range rendered
+  // as "62:05", which reads as a mistake even though it is arithmetically fine.
+  if (m >= 60) {
+    var hh = Math.floor(m / 60);
+    return hh + ":" + (m % 60 < 10 ? "0" : "") + (m % 60) + ":" + (ss < 10 ? "0" : "") + ss;
+  }
   return m + ":" + (ss < 10 ? "0" : "") + ss;
 }
 
@@ -511,7 +654,7 @@ function showSkip(seg) {
   overlay.postMessage("showSkip", { label: SEGMENT_LABELS[seg.kind] || "Skip" });
   syncOverlay();
   // Only while the pill is up, so click-to-pause keeps working otherwise.
-  // The button also needs a `data-clickable` attribute — see overlay.html.
+  // The button also needs a `data-clickable` attribute; see overlay.html.
   try { overlay.setClickable(true); } catch(e) { log("setClickable(true) failed: " + errStr(e)); }
 }
 
@@ -520,9 +663,28 @@ function skipNow(via) {
   if (!activeSegment) {
     return;
   }
+  // Validate before hiding anything. Clearing the pill first meant a target
+  // that could not be seeked left the user with no button and no reason.
   var target = activeSegment.end;
   var kind   = activeSegment.kind;
+  if (!(target > 0)) {
+    iina.console.log("[EpInfo] refusing to seek to " + target + "s");
+    return;
+  }
   hideSkip();
+
+  // Never seek to or past the end of the file. A crowd-sourced "to the end"
+  // marker is stored as the duration itself, so the unadjusted value lands
+  // exactly on EOF, which is where mpv advances to the next playlist item.
+  var duration = 0;
+  try { duration = core.status.duration || iina.mpv.getNumber("duration") || 0; }
+  catch (e) { duration = 0; }
+  if (duration > 0 && target > duration - 0.25) target = Math.max(0, duration - 0.25);
+  // A segment that claims to end before it starts would seek backwards.
+  if (!(target > 0)) {
+    iina.console.log("[EpInfo] refusing to seek to " + target + "s");
+    return;
+  }
 
   var how = "";
   try {
@@ -543,10 +705,7 @@ function skipNow(via) {
     }
   }
 
-  var what = { intro: "intro", recap: "recap", outro: "credits",
-               credits: "credits", preview: "preview" }[kind] || kind;
   iina.console.log("[EpInfo] skipped " + kind + " to " + target + "s via " + how + " (" + via + ")");
-
 }
 
 function hideSkip() {
@@ -590,12 +749,20 @@ function stopTimeWatcher() {
 // The window title, the macOS media panel and IINA's playlist all read
 // mpv's media-title. Left alone, they show "Severance.S02E03.1080p.WEB-DL
 // .mkv"; set, they show what is actually playing.
+function clearMediaTitle() {
+  try {
+    iina.mpv.set("media-title", "");
+  } catch (e) {
+    log("media-title not cleared: " + errStr(e));
+  }
+}
+
 function setMediaTitle(info) {
   if (!info) return;
   var bits = [];
   if (!info.isMovie && info.showTitle) bits.push(info.showTitle);
   if (info.epTitle) bits.push(info.epTitle);
-  var title = bits.join(" — ");
+  var title = bits.join(" · ");
   if (!title) return;
   try {
     iina.mpv.set("media-title", title);
@@ -612,15 +779,21 @@ function registerSidebarHandlers() {
     log("episodeSelected: " + (info ? info.epTitle : "null"));
     currentEpisode = info;
     setMediaTitle(info);
+    // The user may well have paused while this lookup was in flight.
+    presentIfPaused();
     resolveSegments(info);
   });
 
   sidebar.onMessage("clearEpisode", function() {
+    loadSeq++;
     currentEpisode = null;
     segments = [];
     // Hand the title back to mpv so the window stops claiming to know what is
     // playing once the identification is discarded.
     try { iina.mpv.set("media-title", ""); } catch(e) {}
+    // The observer outlived the selection otherwise, and would keep watching
+    // time-pos for a file whose segments no longer exist.
+    stopTimeWatcher();
     hideSkip();
     hideOverlay();
   });
@@ -665,7 +838,7 @@ function registerSidebarHandlers() {
     overlay.postMessage("setTheme", { value: overlayTheme });
   });
 
-  // The sidebar's TMDB key — needed to resolve the IMDB id that every skip
+  // The sidebar's TMDB key, needed to resolve the IMDB id that every skip
   // database is keyed on.
   sidebar.onMessage("setTmdbKey", function(d) {
     tmdbKey = (d && d.key) ? String(d.key) : "";
@@ -683,6 +856,11 @@ function registerSidebarHandlers() {
   // Skip intro/recap/credits toggle
   sidebar.onMessage("setSkipEnabled", function(d) {
     skipEnabled = !!(d && d.enabled);
+    // Abandon anything in flight, as the counter's own comment promises. Without
+    // it a lookup that finishes after the switch re-installs segments, re-arms
+    // the observer and writes its answer into the cache while the feature is
+    // off.
+    loadSeq++;
     if (!skipEnabled) {
       segments = [];
       hideSkip();
@@ -717,7 +895,9 @@ var overlayHandlersRegistered = false;
 function registerOverlayHandlers() {
   if (overlayHandlersRegistered) return;   // never stack duplicates
   overlayHandlersRegistered = true;
-  overlay.onMessage("closeOverlay", function() { hideOverlay(); });
+  // No closeOverlay handler: nothing in overlay.html ever sends that name, and
+  // the sidebar's own dismiss path posts overlayCloseRequest instead. It was a
+  // handler with no sender, which reads like working code.
   overlay.onMessage("skipSegment", function() { skipNow("button"); });
 }
 
@@ -740,31 +920,78 @@ event.on("iina.window-loaded", function() {
 });
 
 event.on("iina.file-loaded", function() {
-  setupSidebar();
+  // Abandon any lookup still in flight before touching the state it writes to.
+  loadSeq++;
+  // The state reset comes first on purpose. sidebar.loadFile throws if the
+  // player window is not loaded yet, and setupSidebar() was called first, so a
+  // throw there skipped every line below and left the previous file's
+  // segments, its time observer and a visible card in place. The postMessage
+  // calls after it do not throw when the window is down; IINA swallows them,
+  // which is why the window-loaded handshake re-sends fileChanged.
   currentEpisode = null;
   segments = [];
+  activeSegment = null;
   hideSkip();
   stopTimeWatcher();
   hideOverlay();
+  // The window title, the macOS Now Playing panel and IINA's own playlist all
+  // read this. Identification is a multi-request ladder, so between this and
+  // the next answer they named the previous episode: clearEpisode has always
+  // done the same, and this path did not.
+  clearMediaTitle();
+  setupSidebar();
   // Capture URL so sidebar can look it up in its URL→episode map
   try { currentVideoUrl = core.status.url || ""; } catch(e) { currentVideoUrl = ""; }
   sidebar.postMessage("fileChanged", { url: currentVideoUrl });
   sidebar.postMessage("overlayStatus", { text: "Select an episode, then pause" });
 });
 
+// Show the card if the video is sitting paused. Identification finishes
+// asynchronously, so a user who pauses during the lookup would otherwise have
+// to pause a second time: the pause event has already come and gone by the
+// time there is an episode to show.
+function presentIfPaused() {
+  if (!overlayEnabled) return;
+  if (!currentEpisode) return;
+  if (!core.status.paused) return;
+  // Already on screen: refresh it in place rather than flashing it off and on.
+  if (cardVisible) { showOverlay(currentEpisode); return; }
+
+  // The delay is for "paused briefly to rewind", so it runs from the pause. The
+  // lookup is asynchronous and the user does not wait for it: pausing during
+  // the lookup used to start the countdown only once the answer arrived, so a
+  // slow ladder added its whole duration on top of the delay. Whatever the
+  // lookup spent is time the user has already been paused, and is spent.
+  var waited = pausedAt ? Math.max(0, Date.now() - pausedAt) : 0;
+  var remaining = pauseDelay * 1000 - waited;
+  if (remaining <= 0) {
+    if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+    showOverlay(currentEpisode);
+    return;
+  }
+
+  // Already counting down, and counting down to the same moment: a lookup
+  // landing mid-pause must not restart or double up the timer.
+  if (pauseTimer) return;
+  pauseTimer = setTimeout(function() {
+    pauseTimer = null;
+    if (core.status.paused && currentEpisode) showOverlay(currentEpisode);
+  }, remaining);
+}
+
 event.on("mpv.pause.changed", function() {
   if (core.status.paused) {
     if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
-    if (!overlayEnabled) return;
+    pausedAt = Date.now();
     if (currentEpisode) {
-      pauseTimer = setTimeout(function() {
-        pauseTimer = null;
-        if (core.status.paused && currentEpisode) showOverlay(currentEpisode);
-      }, pauseDelay * 1000);
+      presentIfPaused();
     } else {
-      log("Paused — no episode selected");
+      // Not a dead end: episodeSelected calls presentIfPaused when the lookup
+      // finishes, so the card appears without waiting for a second pause.
+      log("Paused, waiting for identification");
     }
   } else {
+    // hideOverlay clears the stamp, so the next pause counts from then.
     hideOverlay();
   }
 });

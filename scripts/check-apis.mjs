@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Episode Info — API health check.
+// Episode Info API health check.
 //
 // Verifies that every service the plugin depends on still behaves the way
 // main.js and sidebar.html expect. Exits 0 when everything is intact, 1 when
@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { hostsInSource } from "./lib/url-hosts.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -80,7 +81,7 @@ async function get(url, opts = {}) {
       }
       const text = await res.text();
       let json = null;
-      try { json = JSON.parse(text); } catch { /* not json — fine */ }
+      try { json = JSON.parse(text); } catch { /* not json, fine */ }
       return { status: res.status, json, text, headers: res.headers };
     } catch (err) {
       clearTimeout(timer);
@@ -112,7 +113,7 @@ async function check(name, fn) {
 
 const need = (cond, msg) => { if (!cond) throw new Error(msg); };
 
-// 1. Static check — every URL in the code is allow-listed in Info.json.
+// 1. Static check: every URL in the code is allow-listed in Info.json.
 async function checkAllowlist() {
   const info = JSON.parse(readFileSync(join(ROOT, "Info.json"), "utf8"));
   const allowed = new Set(info.allowedDomains || []);
@@ -122,22 +123,22 @@ async function checkAllowlist() {
   for (const file of sources) {
     let src;
     try { src = readFileSync(join(ROOT, file), "utf8"); } catch { continue; }
-    // Only hosts the plugin itself calls through iina.http / fetch.
-    for (const m of src.matchAll(/(?:iina\.http\.\w+|fetch)\(\s*["'`](https:\/\/[^"'`\/]+)/g)) {
-      hosts.add(new URL(m[1]).hostname);
-    }
-    // String-concatenated URLs, e.g. "https://api.themoviedb.org/3/tv/" + id
-    for (const m of src.matchAll(/["'`]https:\/\/(api\.[^"'`\/]+|image\.[^"'`\/]+|dl\.[^"'`\/]+|sub\.[^"'`\/]+)/g)) {
-      hosts.add(m[1]);
-    }
+    for (const h of hostsInSource(src, /\.html$/.test(file))) hosts.add(h);
   }
 
   const missing = [...hosts].filter((h) => !allowed.has(h));
-  need(missing.length === 0, `host(s) called in code but NOT in Info.json allowedDomains: ${missing.join(", ")}`);
-  return { detail: `${hosts.size} hosts called, all allow-listed` };
+  need(missing.length === 0, `host(s) referenced in code but NOT in Info.json allowedDomains: ${missing.join(", ")}`);
+  // And the other direction: a host on the allow-list that nothing calls is a
+  // promise nothing keeps, and IINA shows these to the user as the destinations
+  // the plugin can reach. Checked with the same scan as above, not a substring
+  // search: a host named only in a comment satisfied "unused" for as long as
+  // that weaker check was here.
+  const unused = [...allowed].filter((h) => !hosts.has(h));
+  need(unused.length === 0, `allowedDomains entries nothing in the code references: ${unused.join(", ")}`);
+  return { detail: `${hosts.size} hosts referenced, all ${allowed.size} allow-listed and all used` };
 }
 
-// 2. TMDB — the only hard requirement. Every route the plugin uses.
+// 2. TMDB, the only hard requirement. Every route the plugin uses.
 async function checkTmdbRoutes() {
   const key = process.env.TMDB_API_KEY;
   const routes = [
@@ -147,6 +148,9 @@ async function checkTmdbRoutes() {
     ["/3/configuration", {}],
     [`/3/tv/${TV.tmdb}`, {}],
     [`/3/tv/${TV.tmdb}/external_ids`, {}],
+    // The episode-level id. main.js asks for it and falls back to the show-level
+    // one, so a break here would quietly cost every episode its IMDB id.
+    [`/3/tv/${TV.tmdb}/season/1/episode/1/external_ids`, {}],
     [`/3/tv/${TV.tmdb}/season/1`, {}],
     // The IMDb fast path: a filename carrying tt\d+ skips the title ladder.
     [`/3/tv/find/${TV.imdb}`, {}],
@@ -169,7 +173,7 @@ async function checkTmdbRoutes() {
 
 async function checkTmdbShape() {
   const key = process.env.TMDB_API_KEY;
-  if (!key) return { skip: "no TMDB_API_KEY secret — response shape not verified" };
+  if (!key) return { skip: "no TMDB_API_KEY secret, so response shape not verified" };
 
   const search = await get(`https://api.themoviedb.org/3/search/multi?api_key=${key}&query=${encodeURIComponent(TV.name)}`);
   need(search.status === 200, `search/multi HTTP ${search.status}`);
@@ -178,7 +182,8 @@ async function checkTmdbShape() {
   need(hit, "no result carried media_type (sidebar.html branches on it)");
   need("id" in hit && ("name" in hit || "title" in hit), "result missing id/name/title used by the sidebar");
 
-  // main.js resolves IMDB ids from here; the whole subtitle cascade depends on it.
+  // main.js resolves IMDB ids from here, and the skip-intro lookups are keyed
+  // on the result.
   const ext = await get(`https://api.themoviedb.org/3/tv/${TV.tmdb}/external_ids?api_key=${key}`);
   need(ext.status === 200, `external_ids HTTP ${ext.status}`);
   need(ext.json?.imdb_id === TV.imdb, `external_ids.imdb_id was "${ext.json?.imdb_id}", expected ${TV.imdb}`);
@@ -216,12 +221,15 @@ async function checkTmdbImages() {
     // Still confirm the image CDN is serving at all.
     const r = await get("https://image.tmdb.org/t/p/w92/");
     need(r.status < 500, `image.tmdb.org returned HTTP ${r.status}`);
-    return { skip: "no TMDB_API_KEY — CDN reachable, poster not fetched" };
+    return { skip: "no TMDB_API_KEY, so CDN reachable but poster not fetched" };
   }
   const cfg = await get(`https://api.themoviedb.org/3/configuration?api_key=${key}`);
   need(cfg.status === 200, `configuration HTTP ${cfg.status}`);
   const base = cfg.json?.images?.secure_base_url;
-  need(base, "configuration.images.secure_base_url missing (sidebar builds poster URLs from it)");
+  // Nothing in the plugin reads secure_base_url: poster and logo URLs are built
+  // from a hardcoded image.tmdb.org prefix. This asserts TMDB still serves one,
+  // not that we consume it.
+  need(base, "configuration.images.secure_base_url missing (TMDB no longer advertises a CDN base)");
 
   const tv = await get(`https://api.themoviedb.org/3/tv/${TV.tmdb}?api_key=${key}`);
   const path = tv.json?.poster_path;
@@ -252,7 +260,7 @@ async function checkAllowlistedHostsLive() {
 
 // Skip-intro sources. Each is optional, so this fails only when one is
 //    genuinely broken or none are usable. 401/403/429 means this runner is
-//    blocked — these sit behind Cloudflare, which challenges datacenter IPs
+//    blocked: these sit behind Cloudflare, which challenges datacenter IPs
 //    while serving real users normally.
 async function checkSkipSources() {
   const qs = `imdb_id=${TV.imdb}&season=1&episode=1`;
@@ -290,7 +298,7 @@ async function checkSkipSources() {
   need(ok.length > 0, `no source usable from here (${blocked.join(", ")})`);
 
   if (blocked.length) {
-    return { warn: `${ok.join(", ")} healthy; ${blocked.join(", ")} — blocked from this runner, not a service fault` };
+    return { warn: `${ok.join(", ")} healthy; ${blocked.join(", ")} blocked from this runner, not a service fault` };
   }
   return { detail: `all ${ok.length} sources answering with the expected shape` };
 }
@@ -327,7 +335,13 @@ async function checkAnimeChain() {
   }
 
   need(hard.length === 0, hard.join("; "));
-  if (soft.length) return { warn: `${soft.join(", ")} — anime lookups unavailable from this runner` };
+  // Both providers merely unreachable is still an outage, and reporting it as a
+  // warning let the daily job exit 0, which closed the tracking issue with
+  // "All APIs are healthy again" while anime intro timings were dead for
+  // everyone. A blocked-or-rate-limited runner stays a warning; total silence
+  // does not.
+  need(soft.length < 2, `both anime providers unreachable: ${soft.join("; ")}`);
+  if (soft.length) return { warn: `${soft.join(", ")} with anime lookups unavailable from this runner` };
   return { detail: `ARM maps ${ANIME.name} to MAL ${mal}, AniSkip answering` };
 }
 
@@ -337,21 +351,21 @@ const fromDotEnv = loadDotEnv();
 const KEY_NAMES = ["TMDB_API_KEY"];
 const configured = KEY_NAMES.filter((k) => process.env[k]);
 
-console.log("Episode Info — API health check");
+console.log("Episode Info API health check");
 if (fromDotEnv !== false) {
   console.log(`Loaded .env (${fromDotEnv} key${fromDotEnv === 1 ? "" : "s"} set)`);
 }
 console.log(
   configured.length
     ? `Keys in use: ${configured.join(", ")}`
-    : "No keys set — running liveness checks only. Add them to .env for full verification."
+    : "No keys set, so liveness checks only. Add them to .env for full verification."
 );
 console.log("");
 
 await check("Info.json allow-list covers every called host", checkAllowlist);
-await check("TMDB — all routes used by the plugin", checkTmdbRoutes);
-await check("TMDB — response shape (search, ids, episodes)", checkTmdbShape);
-await check("TMDB — image CDN and poster paths", checkTmdbImages);
+await check("TMDB: all routes used by the plugin", checkTmdbRoutes);
+await check("TMDB: response shape (search, ids, episodes)", checkTmdbShape);
+await check("TMDB: image CDN and poster paths", checkTmdbImages);
 await check("Skip-intro sources (IntroDB/TheIntroDB/SkipDB)", checkSkipSources);
 await check("Anime chain (ARM \u2192 AniSkip)", checkAnimeChain);
 await check("All allow-listed hosts reachable", checkAllowlistedHostsLive);
@@ -375,7 +389,7 @@ const summary = [
     if (skipped.length) {
   summary.push(
     "> **Skipped checks** need the `TMDB_API_KEY` repository secret to run in full. " +
-    "Without it the endpoints are still proven alive and enforcing auth — " +
+    "Without it the endpoints are still proven alive and enforcing auth, " +
     "only the response shapes go unverified.",
     ""
   );

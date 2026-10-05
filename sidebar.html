@@ -25,7 +25,38 @@
   #s-meta  { font-size: 11px; color: rgba(255,255,255,.45); margin-bottom: 8px; }
   #s-ctx   { font-size: 11px; color: rgba(255,255,255,.32); margin: -5px 0 8px; }
   #s-ctx:empty { display: none; }
+  /* Folder pin: which show this directory was declared to be, and the opt-out
+     that stops new pins being written. */
+  .pin-row {
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; color:rgba(255,255,255,.4);
+    margin:8px 0 6px; cursor:pointer; user-select:none;
+  }
+  .pin-row input { margin:0; cursor:pointer; }
+  #pin-state {
+    display:none; align-items:center; justify-content:space-between; gap:8px;
+    font-size:11px; color:rgba(255,255,255,.45);
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:6px; padding:6px 8px; margin:8px 0 2px;
+  }
+  #pin-state .pin-lbl b { color:rgba(255,255,255,.7); font-weight:600; }
+  #pin-state .pin-x {
+    flex-shrink:0; background:none; border:none; cursor:pointer;
+    color:rgba(255,255,255,.35); font-size:13px; line-height:1; padding:2px 4px;
+    font-family:inherit;
+  }
+  #pin-state .pin-x:hover { color:#fff; }
   #s-meta .rat { color: #f5c518; }
+  /* TMDB's attribution. It lives here rather than on the overlay card so the
+     card stays a clean title card, but the notice still appears where the
+     plugin shows TMDB-derived data. */
+  .attr {
+    margin-top:18px; padding-top:12px;
+    border-top:1px solid rgba(255,255,255,.07);
+    font-size:10px; line-height:1.5; color:rgba(255,255,255,.3);
+  }
+  .attr a { color:rgba(255,255,255,.45); }
 
   /* Description with show more */
   #s-desc { font-size: 12px; color: rgba(255,255,255,.55); line-height: 1.45; margin-bottom: 5px; }
@@ -161,35 +192,10 @@
   summary.sub-hd:hover::before { color: #fff; }
   .sub-sec[open] > summary.sub-hd { margin-bottom: 8px; color: rgba(255,255,255,.5); }
   .sub-sec[open] > summary.sub-hd::before { transform: rotate(90deg); color: rgba(255,255,255,.75); }
-  .key-box { background: rgba(255,140,0,.07); border: 1px solid rgba(255,140,0,.3); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
-  .key-title { font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: rgba(255,140,0,.85); margin-bottom: 4px; }
-  .key-desc  { font-size: 11px; color: rgba(255,255,255,.5); line-height: 1.4; margin-bottom: 6px; }
-  .key-row   { display: flex; gap: 6px; margin-bottom: 5px; }
-  .key-row input { flex: 1; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 6px 9px; color: #fff; font-size: 12px; font-family: inherit; outline: none; }
-  .key-msg:not(:empty) { margin-top: 4px; }
-  .key-msg   { font-size: 11px; min-height: 0; color: rgba(255,255,255,.4); }
-  .key-ok    { background: rgba(48,209,88,.09); border: 1px solid rgba(48,209,88,.3); border-radius: 7px; padding: 6px 12px; margin-bottom: 10px; font-size: 11px; display: none; justify-content: space-between; align-items: center; }
-  .lang-row  { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-  .lang-lbl  { font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: rgba(255,255,255,.35); flex-shrink: 0; }
-  .lang-inp  { flex: 1; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 5px 9px; color: #fff; font-size: 12px; font-family: inherit; outline: none; }
-  .sub-btn2  { width: 100%; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: rgba(255,255,255,.8); font-size: 12px; font-weight: 600; padding: 7px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; }
-  .sub-btn2:hover:not(:disabled) { background: rgba(255,255,255,.15); }
-  .sub-btn2:disabled { opacity: .35; cursor: default; }
-  .sub-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
-  .sub-row:last-child { border-bottom: none; }
-  .sub-info { flex: 1; min-width: 0; }
-  .sub-name { font-size: 12px; color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sub-meta { font-size: 10px; color: rgba(255,255,255,.35); margin-top: 2px; }
-  .sub-load { flex-shrink: 0; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.7); font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
-  .sub-load:hover:not(:disabled) { background: #27ae60; border-color: #27ae60; color: #fff; }
-  .sub-load.loaded { background: #27ae60; border-color: #27ae60; color: #fff; }
-  .sub-none-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 12px; color: rgba(255,255,255,.4); font-style: italic; }
-  .sub-none-btn { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); color: rgba(255,255,255,.55); font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
-  .sub-none-btn.on { background: #555; border-color: #666; color: #fff; }
 </style>
 </head>
 <body>
-<!-- Overlay controls — kept at the top, most-used first -->
+<!-- Overlay controls, kept at the top because they are the most used -->
 <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:7px;padding:7px 10px;margin-bottom:8px">
   <div style="font-size:12px;font-weight:600;color:#fff">Show Overlay on Pause</div>
   <label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;margin-left:10px;cursor:pointer">
@@ -215,8 +221,13 @@
   <div id="s-meta"></div>
   <div id="s-ctx"></div>
   <div id="s-desc" class="collapsed"></div>
-  <button id="show-more" onclick="toggleDesc()">Show more ▾</button>
-  <button id="clear-btn" onclick="doClear()">✕  Clear selection</button>
+<button id="show-more" onclick="toggleDesc()">Show more ▾</button>
+    <div id="pin-state"></div>
+    <label class="pin-row">
+      <input type="checkbox" id="pin-remember" checked onchange="doSetPinRemember(this.checked)" />
+      <span>Remember this folder</span>
+    </label>
+    <button id="clear-btn" onclick="doClear()">✕  Clear selection</button>
 </div>
 
 <!-- API Key Section -->
@@ -246,13 +257,13 @@
 
 <div id="panel"><div class="msg">Search above to find a show or movie.</div></div>
 
-<!-- Recent searches — retype nothing to get back to a show's episode list -->
+<!-- Recent searches, so nothing has to be retyped to get back to a show -->
 <div id="searches-sec" style="display:none;margin-top:8px">
   <div class="sl" style="margin-bottom:5px">Recent Searches</div>
   <div id="searches-list" style="display:flex;flex-wrap:wrap;gap:5px"></div>
 </div>
 
-<!-- Recent picks — reuse a show without searching TMDB again -->
+<!-- Recent picks, to reuse a show without searching TMDB again -->
 <div id="recents-sec" style="display:none">
   <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px">
     <div class="sl" style="margin:0">Recent Picks</div>
@@ -291,7 +302,7 @@
 
 
 
-<!-- Overlay appearance — one box instead of three -->
+<!-- Overlay appearance, in one box instead of three -->
 <div class="op-wrap">
   <div class="op-row">
     <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Shade</div>
@@ -321,9 +332,21 @@
   </div>
 </div>
 
+<!-- TMDB's required notice, shown where their data is displayed. The full
+     wording is reproduced in the README; this is the short form. -->
+<div class="attr">
+  Data from <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.
+  Not endorsed or certified by TMDB.
+</div>
+
 <script>
 var TK = localStorage.getItem("epinfo_tmdb_key") || "";
-var IB = "https://image.tmdb.org/t/p/w92";
+// Poster and logo URLs were written out as literals at six call sites, in three
+// different sizes, with nothing recording which was which.
+var IMG_BASE = "https://image.tmdb.org/t/p/";
+var IB   = IMG_BASE + "w92";    // search results
+var IW   = IMG_BASE + "w500";   // the card's poster
+var IL   = IMG_BASE + "w780";   // the title treatment
 
 var selShow      = null;
 var selSeason    = null;
@@ -345,9 +368,10 @@ var seasonPosterUrl = "";
 var showLogoUrl = "";
 
 // ── Filename parsing → automatic identification ─────────────────
-// Upstream required a manual search for every new file. This fork reads the
-// filename, works out the show title and season/episode, then identifies the
-// file on its own. Anything it can't parse falls back to manual search.
+// The plugin reads the filename, works out the show title and season/episode,
+// then identifies the file on its own. Anything it can't parse falls back to
+// manual search, so a name it cannot read costs a search box rather than a
+// wrong answer.
 
 // A miss costs a full round trip, and the ladder can need several before it
 // lands, so this has to cover more than one query.
@@ -357,26 +381,69 @@ var autoTimerId = null;
 // main.js re-emits fileChanged when the sidebar reports ready, so the same
 // URL can arrive twice. Track what's in flight so we only search once.
 var autoInFlight = {};
+// Bumped whenever the live lookup must be abandoned: a different file, or the
+// user clearing the selection. Every async callback captures the value it
+// started with and abandons its work when it no longer matches.
+//
+// This replaces a guard that read `autoTimerId === null` to mean "still
+// live". That was wrong in two ways. A duplicate fileChanged for the same URL
+// cancelled the timer and then returned early, so the in-flight lookup found
+// a null timer and dropped its result: the file silently failed to identify.
+// And nothing tied a response to the URL that asked for it, so a slow reply
+// could write file A's identification into file B's cache entry.
+var lookupEpoch = 0;
+function invalidateLookups() {
+  lookupEpoch++;
+  autoCancelTimer();
+}
+
+// A token identifies which lookup a piece of async work belongs to, so a
+// response can be matched back to the file that asked for it. Manual picks
+// pass nothing: the user is driving those, and nothing races them.
+function tokenLive(t) {
+  if (!t) return true;
+  return t.epoch === lookupEpoch && currentVideoUrl === t.url;
+}
 
 // Release-group / source / quality noise that is never part of a title.
+// Noise that is safe to delete wherever it appears: codecs, bit depths,
+// channel tags and subtitle-kind markers. None of these is plausibly part of
+// a series name.
 var JUNK_WORDS = [
   "bluray", "blu ray", "bdrip", "brrip", "bdremux", "remux", "webrip", "webdl",
-  "web", "hdtv", "pdtv", "dsr", "dvdrip", "dvd", "hddvd", "hd", "uhd",
+  // Bare "web" is not here: "Web of Lies" is a real episode title and the
+  // global pass deleted the first word of it. It only comes off the end, where
+  // "Show Name 1080p WEB" really does carry it.
+  "hdtv", "pdtv", "dsr", "dvdrip", "dvd", "hddvd", "hd", "uhd",
   "x264", "x265", "h264", "h265", "hevc", "avc", "av1", "xvid", "divx",
   "aac", "ac3", "eac3", "dts", "dtshd", "truehd", "atmos", "flac", "mp3",
   "opus", "dd", "ddl", "dl", "ddp", "dd5", "ddp5",
   "10bit", "8bit", "hdr", "hdr10", "dv", "sdr", "hlg", "hdr10plus",
-  "repack", "proper", "internal", "limited", "extended", "uncut",
-  "retail", "remastered", "imax", "complete", "season", "series",
   // Channel-count and subtitle-kind tags used by Asian scene releases.
-  "ch", "6ch", "2ch", "8ch", "5ch", "jpsc", "big5", "gb", "big5",
-  "softsub", "hardsub", "softsubs", "hardsubs", "subbed", "dubbed",
-  // Language / audio tags. Only trimmed from the END of a title — words
-  // like "German" or "Dark" can legitimately be part of a real title.
-  "german", "english", "french", "spanish", "italian", "japanese", "korean",
-  "nordic", "swedish", "danish", "dutch", "polish", "russian", "turkish",
-  "portuguese", "subs", "multi", "dual"
+  "ch", "6ch", "2ch", "8ch", "5ch", "jpsc", "big5", "gb",
+  "softsub", "hardsub", "softsubs", "hardsubs", "subbed", "subs",
+  // Streaming services, which scene names carry in the middle of the title rather
+  // than at the end: "The Bear ... HULU WEB-DL" searched for "The Bear HULU".
+  // None of these is a word in an English title.
+  "nf", "amzn", "hulu", "atvp", "pcok", "disney", "disneyplus", "netflix",
+  "paramount",
+  // Language codes, with a hard lesson attached: a three-letter code is a real
+  // title word more often than you would think. "Chi" deleted The Chi and
+  // Chi-Raq, "Spa" deleted the 2021 film, "Max" and "Peacock" are titles of
+  // their own. Only codes that are not words belong here, and a new one has to
+  // be checked against a title before it goes in.
+  "ita", "eng", "fra", "ger", "jpn", "kor", "rus", "por",
+  "imdb", "rerip"
 ];
+
+// Deliberately NOT in JUNK_WORDS: "german", "russian", "season", "series",
+// "complete", "limited", "internal", "proper", "web" and the rest of
+// TRAILING_JUNK. They used to be in both lists, and the global pass deleted
+// them from the middle of real titles: "Russian Doll" became "Doll", "The
+// Italian Job" became "The Job", "A Series of Unfortunate Events" became
+// "A of Unfortunate Events", "Web of Lies" became "of Lies". Each of those is
+// a real show. They are only trimmed from the end, where "Show Name German
+// 1080p" really does carry them.
 
 var JUNK_RE = new RegExp(
   "\\b(" + JUNK_WORDS.join("|") + ")\\b", "gi");
@@ -393,8 +460,60 @@ var TRAILING_JUNK = {};
   "limited","extended","uncut","retail","remastered","imax","complete",
   "german","english","french","spanish","italian","japanese","korean",
   "nordic","swedish","danish","dutch","polish","russian","turkish",
-  "portuguese","subs","dubbed","multi","dual"
+  "portuguese","subs","dubbed","multi","dual",
+  // Editorial and format words that are also real title words, so they can
+  // only ever come off the end.
+  "season","series","complete","limited","internal","proper","repack",
+  "retail","remastered","imax","extended","uncut","part","vol","volume",
+  "disc","cd","alt","alternative"
 ].forEach(function(w) { TRAILING_JUNK[w] = 1; });
+
+// Words that cannot be a title on their own. Nothing to do with release
+// noise: they are what is left when the noise is gone, and they are the reason
+// the trailing pass below stops. The editorial words are here because trimming
+// them is only safe while a real word is left standing: "Severance Complete"
+// loses "Complete", "The Limited Series" keeps its name.
+var TITLE_LESS_WORDS = {
+  the: 1, a: 1, an: 1, of: 1, and: 1, or: 1, in: 1, on: 1, at: 1, to: 1,
+  is: 1, it: 1, no: 1, my: 1, this: 1, that: 1,
+  limited: 1, series: 1, season: 1, complete: 1, collection: 1, edition: 1
+};
+
+// Trim trailing noise left behind by the substitutions in cleanTitle:
+// "Severance DL DDP5 H 264" -> "Severance". A bare digit and a letter with
+// digits after it are codec and resolution fragments, never titles.
+//
+// A lone trailing letter is not trimmed. That rule was here to catch the "H" of
+// "DDP5 H 264", but "S.W.A.T", "N.C.I.S" and "M.1931" all lost their letters to
+// it, and those are titles. A letter only counts as noise when numbers follow
+// it, which is what a codec fragment always looks like.
+//
+// It stops rather than trim a name down to articles and prepositions. "The
+// Limited Series" lost "Series", then "Limited", and was left as "The", which
+// searches for nothing and reads worse than the untrimmed name it came from.
+function stripTrailingJunk(t) {
+  // Only at the very end, which is where a codec fragment leaves it: "DDP5 H
+  // 264" leaves "H 264" behind once the tags themselves are gone. Two or three
+  // digits, because four of them is a year and "M 1931" is a film.
+  var letters = t.replace(/\b[A-Za-z]\s+\d{2,3}$/, " ");
+  // A trailing token with no word character in it goes too: removing "DISNEY"
+// from "DISNEY+" leaves a "+", and "Show WEB- +" used to be searched for with
+// the stray signs attached. Only at the end, because a hyphen in the middle is
+// part of a title ("Frieren - Beyond Journey's End").
+var words = letters.split(" ").filter(function(w) { return w; });
+  while (words.length > 1) {
+    var raw = words[words.length - 1];
+    var last = raw.toLowerCase().replace(/[^\w]/g, "");
+    if (!/[a-z0-9]/i.test(raw)) { words.pop(); continue; }
+    if (!TRAILING_JUNK[last] && !/^\d{1,3}$/.test(last)) break;
+    var kept = words.pop();
+    var allWeak = words.every(function(w) {
+      return TITLE_LESS_WORDS[w.toLowerCase().replace(/[^\w]/g, "")];
+    });
+    if (allWeak) { words.push(kept); break; }
+  }
+  return words.join(" ").trim();
+}
 
 function fileNameFromUrl(url) {
   if (!url) return "";
@@ -411,30 +530,84 @@ function parseEpisodeCode(base) {
   // seasonFromName records whether the season was actually written in the
   // filename or merely assumed. The absolute-number convention carries no
   // season at all, and for "Show/Season 2/05.mkv" the directory is a better
-  // authority than that assumption — but it must never override a season the
+  // authority than that assumption, but it must never override a season the
   // filename states outright.
   var pats = [
     // S01E02, s1e2, S01.E02, S01E02E03 (multi-episode pack)
-    { re: /\bS(\d{1,3})[\s._-]*E(\d{1,3})(?:\s*[-_]?\s*E?(\d{1,3}))?\b/i,
+    //
+    // The boundaries are spelled out rather than written \b: an underscore is
+    // a word character, so \b cannot match between "_" and "S" and every
+    // scene-style "Show_Name_S02E05_1080p" fell through to the bare-number
+    // pattern below, which then read the "1" out of "DDP5_1" and called the
+    // episode 1. The far end cannot be \b either: it fails between "05" and
+    // "_".
+    { re: /(?:^|[^A-Za-z0-9])S(\d{1,3})[\s._-]*E(\d{1,3})(?:\s*[-_]?\s*E?(\d{1,3}))?(?![0-9A-Za-z])/i,
       map: function(m) { return { season:+m[1], episode:+m[2], extra: m[3] ? +m[3] : null, seasonFromName: true }; } },
     // 1x02
-    { re: /(?<!\d)(\d{1,2})x(\d{1,3})(?:\s*[-_]\s*(\d{1,3}))?(?!\d)/i,
+    // No lookbehind here or below: it needs Safari 16.4, and the README
+    // promises macOS 12. A non-capturing alternation does the same job and
+    // keeps the group numbering intact, which is what map() relies on.
+    { re: /(?:^|[^\d])(\d{1,2})x(\d{1,3})(?:\s*[-_]\s*(\d{1,3}))?(?!\d)/i,
       map: function(m) { return { season:+m[1], episode:+m[2], extra: m[3] ? +m[3] : null, seasonFromName: true }; } },
     // Season 1 Episode 2
-    { re: /\bSeason[\s._-]*(\d{1,3})[\s._-]*Episode[\s._-]*(\d{1,3})\b/i,
+    { re: /(?:^|[^A-Za-z0-9])Season[\s._-]*(\d{1,3})[\s._-]*Episode[\s._-]*(\d{1,3})(?![0-9A-Za-z])/i,
       map: function(m) { return { season:+m[1], episode:+m[2], extra:null, seasonFromName: true }; } },
-    // "Show Name - 12" — absolute episode number, the common anime/scene
+    // "Naruto.Shippuuden.E484.720p", the anime convention of marking the episode
+    // with a bare E and no season. Four digits, because long-running series
+    // pass 999: One Piece is into the 1100s.
+    { re: /(?:^|[\s._-])E(\d{1,4})(?:[\s._-]|$)/i,
+      map: function(m) { return { season:1, episode:+m[1], extra:null, seasonFromName:false, marker:"E" }; } },
+    // A season with no episode in the name: a season pack, or a pack-style
+    // filename ("Severance.S02.COMPLETE.1080p"). The show can still be
+    // identified and the right season opened, which is the whole point of
+    // reading it at all, so the episode is left null rather than invented.
+    { re: /(?:^|[\s._-])S(\d{1,3})(?![0-9A-Za-z])/i,
+      map: function(m) { return { season:+m[1], episode:null, extra:null, seasonFromName: true }; },
+      seasonOnly: true },
+    { re: /(?:^|[^A-Za-z0-9])Season[\s._-]*(\d{1,3})(?![0-9A-Za-z])/i,
+      map: function(m) { return { season:+m[1], episode:null, extra:null, seasonFromName: true }; },
+      seasonOnly: true },
+    // A number in the middle of the name, between separators, as the anime
+    // "- 05 -" convention writes it:
+    // "AnimePahe_Nippon_Sangoku_-_05_1080p_Amazon". Both sides must be a dash
+    // or underscore, which is what keeps "500 Days of Summer" (space
+    // delimited), "1080p", "x264" and "DDP5" out. No start-of-string case: it
+    // exists to catch "9-1-1" as episode 9, and 9-1-1 is a television series.
+    { re: /[-_][-]?\s*(\d{1,3})(?:[-_]|$)/,
+      map: function(m) { return { season:1, episode:+m[1], extra:null, seasonFromName:false }; },
+      check: function(base, m) {
+        // "DDP5_1" ends in "_1_", which the pattern above matches exactly, and
+        // an episode 1 invented from a codec tag is worse than no episode at
+        // all. A number only counts when it starts a fresh token, which the
+        // character in front of its delimiter decides: a letter or digit
+        // there means the delimiter belongs to something longer. That also
+        // rejects "9-1-1", whose first group hangs off the title's own digits.
+        return !/[A-Za-z0-9]/.test(base.charAt(m.index - 1)); } },
+    // "Show Name - 12", an absolute episode number: the common anime/scene
     // convention. Anchored to the end so a year can't be mistaken for one.
-    { re: /^(.*?)[\s._-]+[-]?\s*(\d{1,3})(?:v\d)?$/i,
+    // Four digits, because a long-running series is the case this pattern
+    // exists for: "[Erai-raws] One Piece - 1062" is episode 1062, and capped
+    // at three it was read as no episode at all, which then showed One Piece
+    // season 1. The year guard below is what keeps 1917 and 2019 out.
+    { re: /^(.*?)[\s._-]+[-]?\s*(\d{1,4})(?:v\d)?$/i,
       map: function(m) { return { season:1, episode:+m[2], extra:null, seasonFromName: false }; } }
   ];
   for (var i = 0; i < pats.length; i++) {
     var m = base.match(pats[i].re);
+    // A pattern can match text it is not allowed to claim: see check above.
+    // Fall through to the next pattern rather than giving up, so a name that
+    // trips one guard can still be read by another.
+    if (m && pats[i].check && !pats[i].check(base, m)) continue;
     if (m) {
       var r = pats[i].map(m);
-      if (!r.episode || r.episode < 0) return null;
-      // A bare 4-digit year is a movie date, not an episode number.
-      if (i === 3 && r.episode >= 1900 && r.episode <= 2099) return null;
+      // An episode is required unless the pattern says otherwise: only a bare
+      // season carries none, and every other pattern matching here is a claim
+      // about the episode number.
+      if ((!pats[i].seasonOnly && !r.episode) || r.episode < 0) return null;
+      // A bare 4-digit year is a movie date, not an episode number. Applied
+      // to every pattern rather than one, so that inserting a pattern above
+      // cannot quietly leave this guard pointing at the wrong one.
+      if (r.episode >= 1900 && r.episode <= 2099) return null;
       if (!r.season || r.season < 0) r.season = 1;
       return r;
     }
@@ -449,23 +622,45 @@ function cleanTitle(base, code) {
   // "Band_of_Brothers_S01E04" would otherwise keep its episode code in the
   // title. Converting to spaces up front makes every pattern below work on
   // ordinary space-separated text.
-  var t = base.replace(/\.[a-z0-9]{2,4}$/i, "");
+  // The extension has already come off in parseFilename, so this is a second
+  // pass for callers that hand over a whole filename. It has to require a
+  // leading letter: "Show.1062" is an episode number, and "[a-z0-9]{2,4}"
+  // matched the digits and deleted the episode from the title.
+  var t = base.replace(/\.[a-z][a-z0-9]{1,3}$/i, "");
   t = t.replace(/[._]+/g, " ").replace(/\s+/g, " ").trim();
 
   // Bracket groups usually hold the noise ("[1080p]", "[SubsPlease]").
   t = t.replace(/\[[^\]]*\]/g, " ").replace(/\([^)]*\)/g, " ");
-  // Trailing "-GROUP" release tag.
-  t = t.replace(/-\s*[A-Za-z0-9]+$/, "");
+  // Trailing "-GROUP" release tag. Only when at least two words would be
+  // left: the pattern cannot tell a release tag from the second half of a
+  // hyphenated title, so unguarded it turned "Spider-Man" into "Spider" and
+  // left "X-Men" with no title at all.
+  var hyphen = t.match(/^(.+?)\s*-\s*[A-Za-z0-9]+\s*$/);
+  if (hyphen && hyphen[1].trim().split(/\s+/).length >= 2) t = hyphen[1];
   // CJK characters only ever appear in scene tags, never in a title we can
   // search TMDB with.
   t = t.replace(/[\u3000-\u9fff\uf900-\ufaff\uff00-\uffef]/g, " ");
 
   if (code) {
     t = t.replace(/\bS\d{1,3}[\s-]*E\d{1,3}(?:[\s-]*E?\d{1,3})?\b/i, " ");
-    t = t.replace(/(?<!\d)\d{1,2}x\d{1,3}(?:\s*[-\s]\s*\d{1,3})?(?!\d)/i, " ");
+    // A bare season, which is all a season pack has: "Severance S02 1080p".
+    if (code.episode === null) {
+      t = t.replace(/(?:^|[\s._-])S\d{1,3}(?![\s-]*E\d)/i, " ");
+      t = t.replace(/(?:^|[^A-Za-z0-9])Season[\s._-]*\d{1,3}(?![\s-]*Episode)/i, " ");
+    }
+    t = t.replace(/(?:^|[^\d])\d{1,2}x\d{1,3}(?:\s*[-\s]\s*\d{1,3})?(?!\d)/i, " ");
     t = t.replace(/\bSeason[\s-]*\d{1,3}[\s-]*Episode[\s-]*\d{1,3}\b/i, " ");
-    // Trailing absolute episode number ("Show Name - 12").
-    t = t.replace(/[\s-]+[-]?\s*\d{1,3}(?:v\d)?$/i, " ");
+    // The bare "E484" anime marker, which has no season to key off.
+    t = t.replace(/(?:^|[\s._-])E\d{1,4}(?:[\s._-]|$)/i, " ");
+    // Trailing absolute episode number ("Show Name - 12"). Four digits, because
+    // that is how a long-running series writes it ("One Piece 1062"), and
+    // leaving it capped at three kept the number in the title and cost a wasted
+    // search. The year guard keeps "1917" and "2019" as titles.
+    t = t.replace(/[\s-]+[-]?\s*\d{1,4}(?:v\d)?$/i, function (m) {
+      var n = parseInt(m.replace(/[^\d]/g, ""), 10);
+      if (n >= 1900 && n <= 2099) return m;
+      return " ";
+    });
   }
 
   // Channel specs must go before digits turn into separate words, and without
@@ -475,23 +670,19 @@ function cleanTitle(base, code) {
   t = t.replace(/\b\d{3,4}x\d{3,4}\b/g, " ");        // 1920x1080
 t = t.replace(JUNK_RE, " ");
   t = t.replace(/\s+/g, " ").trim();
-  // Tolerate trailing space: the year strip is $-anchored and the junk pass
-  // above leaves it.
+
+  // Order matters here. Trailing noise comes off before the year, not after:
+  // "Alien 1979 REMASTERED" only ends in a year once REMASTERED has gone, and
+  // the year strip is $-anchored on purpose, because "Blade Runner 2049" and
+  // "1917" are titles and a year removed from anywhere but the end takes them
+  // apart.
+  t = stripTrailingJunk(t);
+  // Tolerate trailing space: the strips above leave it.
   t = t.replace(/\s*[\(\[]\s*(19|20)\d{2}\s*[\)\]]/g, " ");
   t = t.replace(/\s+(19|20)\d{2}\s*$/, " ");
   t = t.replace(/\s+/g, " ").trim();
-
-  // Trim trailing noise left behind by the substitutions above:
-  // "Severance DL DDP5 H 264" -> "Severance". Bare digits and single letters
-  // at the end are codec/resolution fragments, never titles.
-  var words = t.split(" ");
-  while (words.length > 1) {
-    var last = words[words.length - 1].toLowerCase();
-    if (TRAILING_JUNK[last] || /^\d{1,3}$/.test(last) || /^[a-z]$/.test(last)) {
-      words.pop();
-    } else break;
-  }
-  t = words.join(" ").trim();
+  // And again, for the junk the year removal exposed.
+  t = stripTrailingJunk(t);
 
   // Separators left dangling by the removals ("Breaking Bad -").
   return t.replace(/^[\s\-\u2013\u2014:]+|[\s\-\u2013\u2014:]+$/g, "").trim();
@@ -512,12 +703,53 @@ var FOLDER_NOISE = {
   episode: 1, seasons: 1, season: 1, complete: 1, collection: 1, media: 1,
   downloads: 1, download: 1, desktop: 1, documents: 1, tmp: 1, temp: 1,
   data: 1, unsorted: 1, new: 1, misc: 1, other: 1, public: 1, share: 1,
-  users: 1, user: 1, volume: 1, mediafolder: 1
+  users: 1, user: 1, volume: 1, mediafolder: 1,
+  // What a Plex or Jellyfin library puts *below* the show folder. The walk
+  // stops at the closest real-looking name, so without these a file in
+  // "Severance/Specials/01.mkv" was identified as a show called "Specials".
+  specials: 1, extra: 1, extras: 1, bonus: 1, featurettes: 1, trailers: 1,
+  scenes: 1, behindthescenes: 1, interviews: 1, bloopers: 1, samples: 1,
+  omake: 1, deleted: 1, deletedscenes: 1, subs: 1, subtitles: 1,
+  staffel: 1, saison: 1, staffeln: 1, temporada: 1
+};
+
+// Descriptor folders that sit inside a season folder, which the walk steps over
+// rather than stopping at. FOLDER_NOISE stops the walk because a container name
+// says nothing about what is above it; "4K" and "Official" say nothing either,
+// but stopping there throws the show away, and "Severance/Season 2/4K/05.mkv"
+// has a perfectly good show two segments up.
+var FOLDER_SKIP = {
+  "4k": 1, "8k": 1, "official": 1, "unrated": 1, "finalcut": 1, "directorscut": 1,
+  "extendedcut": 1, "uncut": 1, "theatrical": 1, "remastered": 1, "proper": 1,
+  "dualaudio": 1, "dual": 1, "dubbed": 1, "original": 1, "complete": 1,
+  "english": 1, "german": 1, "spanish": 1, "french": 1, "italian": 1, "japanese": 1,
+  "multi": 1, "hdr": 1, "dolby": 1, "vision": 1, "hdr10": 1, "sdr": 1,
+  "audio": 1, "cut": 1, "final": 1, "directors": 1, "extended": 1,
+  "remux": 1, "web": 1, "webdl": 1, "bluray": 1, "uhd": 1, "hd": 1, "dl": 1
+};
+
+// Every word of a segment has to be descriptor noise for the walk to step over
+// it. Matching the whole segment missed "4K HDR" and "Official 4K", which Plex
+// writes inside season folders, and each one became the name of the show.
+function isDescriptorFolder(seg) {
+  var words = seg.toLowerCase().split(/[\s._-]+/).filter(Boolean);
+  if (!words.length) return false;
+  return words.every(function(w) { return FOLDER_SKIP[w.replace(/['’]/g, "")] === 1; });
+}
+
+// Words that a bracket group can be made entirely of without being a series
+// name. Fansubs label the audio and subtitle tracks this way, and a multi-word
+// group is otherwise trusted first, so "[SubsPlease] Frieren - 21 [Dual Audio]"
+// searched for "Dual Audio" before it searched for the show.
+var BRACKET_NOISE = {
+  multiple: 1, multi: 1, subtitle: 1, subtitles: 1, subs: 1, sub: 1,
+  audio: 1, dual: 1, batch: 1, uncensored: 1, dubbed: 1, english: 1,
+  softsub: 1, hardsub: 1, softsubs: 1, hardsubs: 1, burn: 1, burnt: 1
 };
 
 // How far up the tree to look. "Show/Season 2/05.mkv" needs two levels, and
 // past three the names belong to the disk, not the show.
-var FOLDER_LOOKUP_DEPTH = 3;
+var FOLDER_LOOKUP_DEPTH = 5;
 
 function pathSegments(url) {
   var s = String(url || "");
@@ -534,7 +766,7 @@ function pathSegments(url) {
 // A name that cannot be a show title, however it is spelled.
 function isRealTitle(t) {
   if (!t || t.length < 2) return false;
-  // Digits alone are an episode number or a year, not a name — except where a
+  // Digits alone are an episode number or a year rather than a name, except where
   // film really is called "1917", which is why the caller only discards these
   // when a directory name is available to take their place.
   if (/^\d+$/.test(t)) return false;
@@ -544,35 +776,111 @@ function isRealTitle(t) {
 // A word that stands in for a title rather than being one. Kept separate from
 // isRealTitle because these can be discarded outright, whereas a numeric title
 // like "1917" is a real one and may only be replaced, never dropped. Anchored
-// to the end so that a title merely starting with the letters — "E.V.A." —
-// is not mistaken for one.
+// to the end so that a title merely starting with the letters, such as
+// "E.V.A.", is not mistaken for one.
 function isPlaceholderTitle(t) {
-  return !!t && /^(?:episode|ep|e|part|pt|disc|cd|dvd|vol|volume|file|track)\.?$/i.test(t.trim());
+  if (!t) return false;
+  var s = t.trim();
+  if (/^(?:episode|ep|e|part|pt|disc|cd|dvd|vol|volume|file|track)\.?$/i.test(s)) return true;
+  // Release noise on its own is a placeholder as well. "WEB" is all that is
+  // left of "S02E03.1080p.WEB-DL.DDP5.1.H.264-NTb.mkv": it names nothing, and
+  // a directory beside it was the better answer all along. Only the case where
+  // every single word is noise counts, so "Severance Extended" keeps its
+  // cleanup while "WEB" gives way.
+  var words = s.split(/\s+/);
+  return words.every(function(w) {
+    w = w.toLowerCase();
+    return TRAILING_JUNK[w] === 1 || JUNK_WORDS.indexOf(w) !== -1;
+  });
 }
 
 // Directory names only, so ["Severance", "Season 2"] for
 // "file:///…/Severance/Season 2/05.mkv".
+// ── Folder pins ─────────────────────────────────────────────────────
+// Release groups, fansub names, site prefixes and misspelled series names are
+// an open set: no list of patterns covers them, and the tail never ends.
+// Episode numbering is a closed set. So the show is decided once by the user
+// and remembered per directory, and only the episode is parsed from the name.
+//
+// A pin covers the directory it names and everything below it, so pinning
+// "…/samurai champloo" also covers "…/samurai champloo/Season 1/05.mkv".
+
+// Off by default for the *feature*, on by default for *writing* pins: see
+// doSetPinRemember.
+function loadFolderMap() {
+  // Read straight through rather than cached in a module variable, for the
+  // same reason loadUrlMap does: one source of truth, and no way for the
+  // cached copy to drift from what is actually stored.
+  try {
+    var v = JSON.parse(localStorage.getItem("epinfo_folder_map") || "{}");
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    return v;
+  } catch (e) { return {}; }
+}
+function saveFolderMap(m) {
+  try { localStorage.setItem("epinfo_folder_map", JSON.stringify(m)); } catch (e) {}
+}
+function pruneFolderMap() {
+  var m = loadFolderMap();
+  var dropped = dropStale(m, URL_MAP_MAX_AGE_MS, Date.now());
+  if (dropped) saveFolderMap(m);
+  return dropped;
+}
+
+// How far up to look for a pin. Matches the folder-hint walk so a pin is
+// found from inside a Season folder as readily as from the show folder.
+var PIN_LOOKUP_DEPTH = FOLDER_LOOKUP_DEPTH;
+
+// The nearest pinned directory at or above this file, or null.
+function pinForUrl(url) {
+  var m = loadFolderMap(), segs = pathSegments(url);
+  var floor = Math.max(0, segs.length - PIN_LOOKUP_DEPTH);
+  for (var i = segs.length - 1; i >= floor; i--) {
+    if (m[segs[i]]) return { dir: segs[i], show: m[segs[i]] };
+  }
+  return null;
+}
+
+// Touch a pin so a library still in use never ages out.
+function touchPin(dir) {
+  var m = loadFolderMap();
+  if (!m[dir]) return;
+  m[dir].lastSeen = Date.now();
+  saveFolderMap(m);
+}
+
+function unpinFolder(dir) {
+  var m = loadFolderMap();
+  if (!m[dir]) return;
+  delete m[dir];
+  saveFolderMap(m);
+}
+
 function parseFolderHints(url) {
   var segs = pathSegments(url);
-  var out = { title: "", season: null, year: null };
+  // `dir` is the directory the title came from, which is what gets pinned:
+  // the show folder, not the Season folder or the media folder below it.
+  var out = { title: "", season: null, year: null, dir: "" };
   var floor = Math.max(0, segs.length - FOLDER_LOOKUP_DEPTH);
 
   for (var i = segs.length - 1; i >= floor; i--) {
     var seg = segs[i];
     if (!seg) continue;
 
-    // "Season 2" or "S02" as a whole segment: a season, never a title.
-    var whole = /^(?:season|s)[\s._-]*(\d{1,3})$/i.exec(seg);
+    // "Season 2" or "S02" as a whole segment: a season, never a title. German
+    // and French library tools write "Staffel 2" and "Saison 2" for the same
+    // thing, and without these the folder was identified as a series.
+    var whole = /^(?:season|staffel|saison|s|temporada|sezon|staffa|stor)[\s._-]*(\d{1,3})$/i.exec(seg);
     if (whole) {
       if (out.season === null) out.season = parseInt(whole[1], 10);
       continue;
     }
-    // "Severance Season 2" — one segment holding both.
-    var inner = /\bseason[\s._-]*(\d{1,3})\b/i.exec(seg);
+    // "Severance Season 2", one segment holding both.
+    var inner = /\b(?:season|staffel|saison|temporada|sezon|staffa|stor)[\s._-]*(\d{1,3})\b/i.exec(seg);
     if (inner) {
       if (out.season === null) out.season = parseInt(inner[1], 10);
       var rest = cleanTitle(seg.replace(inner[0], " "), null);
-      if (isRealTitle(rest)) { out.title = rest; break; }
+      if (isRealTitle(rest)) { out.title = rest; out.dir = seg; break; }
       continue;
     }
     // A bare year directory is the film's date, not its title.
@@ -583,7 +891,11 @@ function parseFolderHints(url) {
     // Anything below this point describes the disk rather than the show, and
     // the walk stops rather than stepping over it: continuing upward is what
     // ended up naming a show after the user's own home directory.
-    if (/^\d{3,4}[pi]$/.test(seg.toLowerCase())) break;   // "1080p"
+    // A resolution folder is a descriptor like any other. It used to stop the walk,
+// which threw the show away for "Severance/Season 2/2160p/05.mkv", a layout
+    // Plex writes, while the same directory with "4K" in it was stepped over.
+    if (/^\d{3,4}[pi]$/.test(seg.toLowerCase())) continue;
+    if (isDescriptorFolder(seg)) continue;
     if (FOLDER_NOISE[seg.toLowerCase().replace(/[\s._-]+/g, "")]) break;
 
     var cleaned = cleanTitle(seg, null);
@@ -591,22 +903,168 @@ function parseFolderHints(url) {
     // "The Complete Series" cleans down to an article, which is no title.
     if (/^(?:the|a|an|of|and|to|in|on|my|all|final|complete)$/i.test(cleaned)) continue;
     out.title = cleaned;
+    out.dir = seg;
     break;   // the closest name to the file wins
   }
 
   return out.title ? out : null;
 }
 
+// ── Bracket groups ─────────────────────────────────────────────────
+// Fansub-style names put the series in the leading bracket group, because for
+// a fansub the group name *is* the series:
+//
+//   [One Pace][1062-1063] Egghead 04 [1080p][En Sub][FD5592BE].mp4
+//
+// cleanTitle has to delete every bracket group to strip the noise, so the
+// series name goes with it. What survives is "Egghead 04", and the plugin
+// ends up searching for the wrong show entirely. The groups are therefore
+// collected before the stripping and offered to the search as candidates of
+// their own.
+
+// Split into "looks like a series name" and "probably a tag". A multi-word
+// group is treated as the former, which covers "One Pace" and "Frieren:
+// Beyond Journey's End" while stepping over the run-on tags fansubs use for
+// the same slots ("SubsPlease", "EMBER", "Anime-Raws"). Single-word groups are
+// still worth having, because "[Frieren] - 05.mkv" is real, but only once the
+// filename's own title has had its turn, since they are far more often a tag.
+function bracketTitles(base) {
+  var strong = [], weak = [], m;
+  var re = /\[([^\]]+)\]/g;
+  while ((m = re.exec(base)) !== null) {
+    var t = cleanTitle(m[1], null);
+    if (!isRealTitle(t)) continue;
+    // No letters at all: an episode range such as "[1062-1063]", not a name.
+    if (!/[a-z]/i.test(t)) continue;
+    // A CRC32 checksum, e.g. "[FD5592BE]": hex letters only, and at least one
+    // digit. Requiring the digit is what keeps real words out: every English
+    // word made only of the letters a-f is short, but "Decade", "Facade" and
+    // "Beaded" were all being discarded as checksums.
+    var squashed = t.replace(/\s/g, "");
+    if (/^[0-9a-f]{6,8}$/i.test(squashed) && /[0-9]/.test(squashed)) continue;
+    // A group made entirely of track labels: "[Dual Audio]", "[Multiple
+    // Subtitles]". Multi-word groups are otherwise taken as series names, and
+    // these are searched before the filename's own title.
+    var noise = true;
+    t.split(/\s+/).forEach(function(w) {
+      if (!BRACKET_NOISE[w.toLowerCase().replace(/[^\w]/g, "")]) noise = false;
+    });
+    if (noise) continue;
+    var bucket = /\s/.test(t) ? strong : weak;
+    if (bucket.indexOf(t) === -1) bucket.push(t);
+  }
+  return { strong: strong, weak: weak };
+}
+
+// An absolute episode number from inside a bracket group: "[1062-1063]".
+// Three digits or more is past anything a season/episode code can express, and
+// TMDB gives no reliable way to map it. Season 20 of One Piece might be
+// episode 1000 or episode 1010 depending on how the split falls.
+// "[Group][12][1080p]" writes the episode inside a bracket, where the bracket
+// stripping below would destroy it before any pattern could see it.
+function episodeFromBrackets(base) {
+  var m, re = /\[([^\[\]]+)\]/g;
+  while ((m = re.exec(base)) !== null) {
+    if (/^\d{1,3}$/.test(m[1].trim())) return parseInt(m[1], 10);
+  }
+  return null;
+}
+
+// Vertical resolutions, which a bare bracket group is far more likely to hold
+// than an episode number. "Show.S01E05.[1080].mkv" put the resolution in
+// brackets and the code in the name; reading the bracket as the episode
+// invented episode 1080 and, because an absolute number suppresses the
+// filename's own code, lost S01E05 as well. Fansub layouts do the same:
+// "[Group][Show Name][01][1080]".
+var RESOLUTION_VALUES = {
+  480: 1, 540: 1, 576: 1, 720: 1, 1080: 1, 1440: 1, 2160: 1, 4320: 1, 8640: 1
+};
+
+function absoluteFromBrackets(base) {
+  var m, re = /\[([^\]]+)\]/g;
+  while ((m = re.exec(base)) !== null) {
+    // Only a group made purely of digits and separators can be an episode
+    // number. "[1080p]", "[DDP5.1]" and "[FD5592BE]" all carry other
+    // characters, and reading any of those as 1080 would throw away a
+    // perfectly good episode code.
+    if (!/^[\d\s\-–—_,]+$/.test(m[1])) continue;
+    var nums = m[1].match(/\d{3,4}/g);
+    if (!nums) continue;
+    // "[1080-1920]" is a resolution pair, and reading it as episode 1080 also
+    // suppresses the filename's real episode code. Judged on the aspect ratio
+    // rather than a doubling: 1920/1080 is 1.78, so 1080 * 2 = 2160 never
+    // matched. A range like "[1062-1063]" has a ratio of about 1 and is left
+    // alone.
+    if (nums.length === 2 && /^[\s\-–—_,]+$/.test(m[1].replace(/\d{3,4}/g, ""))) {
+      var pair = nums.map(function (x) { return parseInt(x, 10); }).sort(function (x, y) { return x - y; });
+      var ratio = pair[0] ? pair[1] / pair[0] : 0;
+      if (pair[0] >= 480 && ratio >= 1.3 && ratio <= 2.2) continue;
+    }
+    for (var i = 0; i < nums.length; i++) {
+      var n = parseInt(nums[i], 10);
+      if (n < 1000) continue;
+      // One number on its own and it is a resolution, not an episode. "[1062]"
+      // is still an episode, because 1062 is not a resolution.
+      if (nums.length === 1 && RESOLUTION_VALUES[n]) continue;
+      // The air year in brackets is the commonest thing in this slot for a
+      // fansub ("[Doki] Show - 01 [1920x1080][BDRip][2011][JSC]"), and reading
+      // it as an episode suppressed the filename's own code and made every
+      // query look for a film. parseEpisodeCode refuses a year for the same
+      // reason.
+      if (n >= 1900 && n <= 2099) continue;
+      return n;
+    }
+  }
+  return null;
+}
+
+// The most recent parse, kept so the pin writer can ask which directory
+// supplied the title without parsing the URL a second time.
+var currentParsed = null;
+
 function parseFilename(url) {
   var fname = fileNameFromUrl(url);
   if (!fname) return null;
   var base = fname.replace(/\.[a-z0-9]{2,4}$/i, "");
 
+  // "05 - Hello, Ms. Cobel.mkv" and "05. Hello, Ms. Cobel.mkv" are how library
+  // tools lay out an episode when the season lives in the directory: the
+  // counter leads and the episode name follows it. The name is metadata, not a
+  // series, so it is taken off rather than searched. Left in place it read as a
+  // real title, which stopped the directory from ever being consulted and left
+  // nothing to identify.
+  //
+  // Only with a directory to supply the show, though. The shape is also how
+  // people name their own files, "01 - Christmas 2019.mp4", and outside a
+  // season folder there is nothing above it, so stripping it left "Christmas"
+  // as a film title to search for, on a file that should have been ignored.
+  // Computed here rather than where it was needed because it decides whether
+  // the counter is read at all.
+  var hints = parseFolderHints(url);
+  var leading = hints ? /^\d{1,3}\s*[-.\u2013\u2014]\s+(?=\S)/.exec(base) : null;
+  if (leading) base = base.slice(leading[0].length);
+
   // An IMDb id in the name identifies the title outright, so it is worth
   // carrying: it replaces the whole title ladder with a single lookup. Some
-  // scene releases and most library rips include one.
-  var imdb = /(?:^|[^a-z0-9])(tt\d{7,8})(?:[^0-9]|$)/i.exec(fname);
+  // scene releases and most library rips include one. Matched against the
+  // extension-free name, because the id is then removed from the same string:
+  // matching it in the name with the extension still attached made the removal
+  // a no-op whenever the id ended the basename, and "imdb tt11280740" stayed in
+  // the title.
+  var imdb = /(?:^|[^a-z0-9])(tt\d{7,8})(?:[^0-9]|$)/i.exec(base);
   var imdbId = imdb ? imdb[1].toLowerCase() : null;
+
+  // A date, not an episode and not a release year. "The Daily Show - 2023-01-15"
+  // is a daily show named after the day it aired, and Plex writes it that way.
+  // Removed before anything reads the name: left in, the year made the file look
+  // like a film so every query went to search/movie, and the trailing number
+  // pattern read the "15" as episode 15.
+  base = base.replace(/(?:^|[^\d])(?:19|20)\d{2}[.\-]\d{2}[.\-]\d{2}(?!\d)/g, " ").trim();
+
+  // Collected before the stripping below, which is what destroys them.
+  var altTitles = bracketTitles(base);
+  var absolute = absoluteFromBrackets(base);
+  var code = null;
 
   // Brackets usually hold the noise ("[1080p]", "[SubsPlease]") and would
   // otherwise defeat the end-anchored absolute-episode pattern.
@@ -614,7 +1072,79 @@ function parseFilename(url) {
                      .replace(/\([^)]*\)/g, " ")
                      .replace(/[._]+/g, " ")
                      .replace(/\s+/g, " ").trim();
-  var code = parseEpisodeCode(stripped) || parseEpisodeCode(base);
+
+  // An absolute number in a bracket group makes the trailing small number
+  // meaningless rather than an episode code: in
+  // "[One Pace][1062-1063] Egghead 04 [...]" that "04" is the fansub's own
+  // counter, and trusting it would show "One Piece S01E04" for episode 1062.
+  // The series is still worth identifying, so the episode is dropped and the
+  // picker is left for the user.
+  //
+  // The numeric version is tried first. Channel specs and codec fragments end
+  // the name and carry digits the absolute-number pattern would otherwise read
+  // as an episode: "DDP5.1" leaves a trailing 1, "H.264" leaves 264. They have
+  // to go before the separators are flattened, because afterwards "DDP5.1" is
+  // indistinguishable from "DDP5 1".
+  // Kept with its separators intact. The mid-string episode pattern anchors on
+  // "-" and "_", so a name whose digits are delimited by those has to be read
+  // before they are flattened to spaces.
+  var numRaw = base
+    // The chain is matched whole, not up to its first digit: "DTS-HD.MA.5.1"
+    // stopped at the 5 and left a ".1" that then read as episode 1.
+    .replace(/\bDDP?[0-9](?:\.[A-Za-z0-9]{1,3})*\.[0-9](?![0-9])/gi, " ")
+    .replace(/\bDTS(?:-HD)?(?:\.[A-Za-z0-9]{1,3})*\.[0-9](?![0-9])/gi, " ")
+    .replace(/\bDTS-?HD(?:\.[A-Za-z0-9]{1,3})*\b/gi, " ")
+    // The same chain written with underscores: "DDP5_1", "AAC2_0",
+    // "DTS-HD_MA_5_1". A codec-shaped tag has to lead, so "Show_1_2" keeps its
+    // numbers; and the trailing digit is not allowed to run into another, so
+    // "DDP5_10" keeps its 10. No closing \b: an underscore is a word character,
+    // so it cannot match between that digit and the underscore in "_1_atmos",
+    // which left this rule matching nothing at all and the episode number being
+    // read out of the spec instead.
+    .replace(/\b(?:DD|DD[P5]?|DTS(?:[-_]HD)?|E?AC-?3|AAC|TRUEHD|FLAC|OPUS|ATMOS)[0-9]?(?:[._-][A-Za-z0-9]{1,3})*[._-][0-9](?![0-9])/gi, " ")
+    .replace(/\b[0-9](?:\.[A-Za-z0-9]{1,3})*\.[0-9](?![0-9])\b/g, " ")  // a bare "5.1"
+    .replace(/\bH\.[0-9]{3}\b/gi, " ")
+    .replace(/\bX26[45]\b/gi, " ")
+    .replace(/\bHEVC\b/gi, " ");
+  var numStripped = numRaw
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[._]+/g, " ")
+    .replace(/\s+/g, " ").trim();
+  if (absolute === null) {
+    // Never the raw name. Falling back to it is what produced the DDP5.1 bug:
+    // the cleaned form has no episode, then the raw one finds the trailing "1"
+    // and invents episode 1.
+    code = parseEpisodeCode(numRaw) || parseEpisodeCode(numStripped);
+    if (!code) {
+      var bracketed = episodeFromBrackets(base);
+      if (bracketed !== null) {
+        code = { season: 1, episode: bracketed, extra: null, seasonFromName: false };
+      }
+    }
+  }
+
+  // A four-digit absolute number is past anything a season can express, so it
+  // is located by adding up the show's seasons rather than being read as season
+  // 1. "[Erai-raws] One Piece - 1062" is episode 1062, which for One Piece is
+  // season 20; reporting S01E1062 is a number no season list has.
+  //
+  // It only counts when something is left to search for. A camera file is
+  // "IMG_1234.MOV": one short word and four digits, which is the same shape,
+  // and every photo and clip in a personal library then identified itself as
+  // episode 1234 of a show called IMG.
+  if (code && !code.seasonFromName && code.episode >= 1000) {
+    var attributable = code.marker === "E" ||
+      cleanTitle(base, code).split(/\s+/).filter(Boolean).length > 1;
+    if (attributable) {
+      absolute = code.episode;
+      code = null;
+    } else {
+      // A number too big for any season, in a name with nothing else in it.
+      // That is a camera file, not an episode, so no episode is claimed.
+      code = null;
+    }
+  }
 
   // A file called "05.mkv" holds an episode number with nothing in front of
   // it, which the absolute-number pattern needs. Only one to three digits:
@@ -623,15 +1153,39 @@ function parseFilename(url) {
     code = { season: 1, episode: parseInt(stripped, 10), extra: null, seasonFromName: false };
   }
 
+  // …and the counter that led the filename, taken off above.
+  if (!code && leading) {
+    code = { season: 1, episode: parseInt(leading[0], 10), extra: null, seasonFromName: false };
+  }
+
   // The id is not part of the name, and leaving it in would pollute the title
   // for the ladder in case the id lookup misses.
-  var title = cleanTitle(imdbId ? base.replace(imdb[0], " ") : base, code);
-  var hints = parseFolderHints(url);
+  // Cleaned from numRaw, not base. The leftover "1" of "DDP5.1" survives as a
+  // bare trailing token, which then blocks the $-anchored year strip and left
+  // titles reading "Movie Title 2019".
+  var title = cleanTitle(imdbId ? numRaw.replace(imdb[0], " ") : numRaw, code);
+  // …and an absolute number is not an episode code either, so it stays in the
+  // title unless it is taken off here. "One Piece 1062" searched for itself
+  // before the ladder got to "One Piece".
+  if (absolute !== null) {
+    title = title.replace(new RegExp("[\\s.-]*" + absolute + "v?\\d*$"), " ").trim();
+  }
 
+  // Set only when the directory supplied the title. A title the filename gave
+  // on its own is not pinned: in a flat library the parent directory is
+  // usually the whole media folder, and pinning that to one show would be
+  // actively wrong.
+  var titleDir = "";
   if (hints) {
     // The directory supplies a title when the filename has none to give, or
     // when all it offers is a number or a placeholder word like "Episode".
-    if (!isRealTitle(title)) title = hints.title;
+    //
+    // …or when the filename is in the leading-counter layout, where what
+    // follows the counter is the episode's name rather than the show's. It
+    // reads as a real title, which would keep the directory from ever being
+    // asked, and every file in a season folder would then be searched for by
+    // its own episode name.
+    if (leading || !isRealTitle(title)) { title = hints.title; titleDir = hints.dir; }
     // …and a season, but only where the filename did not state one.
     if (code && hints.season !== null && !code.seasonFromName) {
       code = { season: hints.season, episode: code.episode, extra: code.extra, seasonFromName: false };
@@ -642,7 +1196,21 @@ function parseFilename(url) {
     title = "";
   }
 
-  if (!title || title.length < 2) return null;
+  // The filename can hold nothing but bracket groups, which cleanTitle then
+  // deletes: "[Jujutsu Kaisen][47][AVC-8bit][1080p].mkv" has no title left, and
+  // the series name that bracketTitles had already recovered was discarded
+  // with it. Fall back to it.
+  //
+  // A single-word bracket group is used, and where there are several the LAST one
+  // is the best guess: fansubs put the release group first and the series beside
+  // the number, so "[Group][Show][01][1080]" is a show called "Show". Taking the
+  // first one showed a series called "Group", which is the wrong answer rather
+  // than no answer. Every group stays in the candidate ladder, so the ordering
+  // only decides what is asked first; titleScore still decides what is kept.
+  if (!title || title.length < 2) {
+    if (altTitles.strong.length) title = altTitles.strong[0];
+    else if (altTitles.weak.length) title = altTitles.weak[altTitles.weak.length - 1];
+  }
 
   // A release year, which is how a film is told apart from a TV episode: no
   // episode code, but a year in the name. Resolutions and channel specs are
@@ -658,17 +1226,35 @@ function parseFilename(url) {
     year = parseInt(years[years.length - 1].replace(/[^\d]/g, ""), 10);
   }
 
-  // An IMDb id in the name identifies the title outright, so it is worth
-  // carrying: it replaces the whole title ladder with a single lookup. Some
-  // scene releases and most library rips include one.
-  var imdb = /(?:^|[^a-z0-9])(tt\d{7,8})(?:[^0-9]|$)/i.exec(fname);
-  var imdbId = imdb ? imdb[1].toLowerCase() : null;
+  // Three digits is usually a counter that found its way into the title slot,
+  // and searching TMDB for "01" returns nothing usable. Four digits is
+  // different: 1917 and 2001 are real titles. So are some of the shorter ones
+  // once something else says what they are: "300.2006" and "24.S01E01" are a
+  // film and a series respectively, and a title equal to its own episode
+  // number is a counter with nothing to identify.
+  var digits = /^\d{1,3}$/.test(title);
+  var counter = digits && code && Number(title) === code.episode;
+  if (digits && (counter || !(code || year))) return null;
 
-  return {
+  // One character is a title as well: "M" (1931) and "9" (2006) are both films.
+  // With nothing else to go on it is far more likely to be a leftover, which is
+  // what the two lines above have already established.
+  if (!title || (title.length < 2 && !year)) return null;
+
+
+  // One object, shared. This used to be written out twice into two variables,
+  // which meant a caller mutating the result also changed currentParsed behind
+  // it, and every added field had to be added in two places.
+  var parsed = {
     fileName: fname, title: title, code: code, year: year, imdbId: imdbId,
+    // Series names recovered from bracket groups, and the absolute episode
+    // number that made the filename's own episode code untrustworthy.
+    altTitles: altTitles, absolute: absolute, titleDir: titleDir,
     // No episode code but a year: almost certainly a film.
     isMovie: !code && !!year
   };
+  currentParsed = parsed;
+  return parsed;
 }
 
 function autoCancelTimer() {
@@ -689,34 +1275,11 @@ function titleCandidates(title) {
     if (s.length >= 2 && out.indexOf(s) === -1) out.push(s);
   }
   for (var i = words.length; i >= 1; i--) push(words.slice(0, i).join(" "));
-  // Never fall back to a bare article — TMDB would happily return every show
+  // Never fall back to a bare article, because TMDB would return every show
   // starting with "The" and we'd pick one at random.
   return out.filter(function(s) {
     return !/^(the|a|an|of|and|to|in|on)$/i.test(s);
   });
-}
-
-// How well a result's name matches the query that found it, from 0 to 1.
-// TMDB's search is forgiving — a query carrying leftover noise happily
-// returns a show that merely starts the same way, and taking the highest
-// vote count then locks in the wrong series for the rest of the session.
-function titleScore(query, name) {
-  var q = normalizeForMatch(query), n = normalizeForMatch(name);
-  if (!q || !n) return 0;
-  if (q === n) return 1;
-  var qs = q.split(" "), ns = n.split(" ");
-  // The candidate is a prefix of the real title ("Severance" for "Severance:
-  // The Office"), which is what the ladder is designed to produce. Penalise
-  // only for how much extra name came back.
-  if (n.indexOf(q) === 0) return 0.9 - 0.1 * (ns.length - qs.length) / ns.length;
-  if (q.indexOf(n) === 0) return 0.85 - 0.1 * (qs.length - ns.length) / qs.length;
-  // Token overlap, so "Office US" still matches "The Office US" without the
-  // articles getting in the way.
-  var seen = {}, shared = 0, i;
-  for (i = 0; i < qs.length; i++) seen[qs[i]] = 1;
-  for (i = 0; i < ns.length; i++) if (seen[ns[i]]) shared++;
-  var union = qs.length + ns.length - shared;
-  return union ? shared / union : 0;
 }
 
 // Below this, the result does not look like the thing that was asked for, so
@@ -724,6 +1287,96 @@ function titleScore(query, name) {
 var AUTO_MIN_SCORE = 0.6;
 // Below this, a result is unrelated and is not used even as a last resort.
 var AUTO_WEAK_SCORE = 0.34;
+
+// How well a result's name matches the query that found it, from 0 to 1.
+// TMDB's search is forgiving: a query carrying leftover noise happily
+// returns a show that merely starts the same way, and taking the highest
+// vote count then locks in the wrong series for the rest of the session.
+function titleScore(query, name) {
+  var q = normalizeForMatch(query), n = normalizeForMatch(name);
+  if (!q || !n) return 0;
+  if (q === n) return 1;
+  var qs = q.split(" "), ns = n.split(" ");
+  // Token prefix, never a raw string prefix. The ladder exists to send
+  // progressively shorter prefixes, so "Severance" matching "Severance: The
+  // Office" is the design working. But "Man" is also a string prefix of
+  // "Maniac Mansion", and matching that is not. Comparing whole words keeps
+  // the first case and drops the second.
+  //
+  // A word-prefix match is always accepted, and the penalty only ranks a long
+  // result against a short one. That is deliberate: a one-word candidate
+  // finding a six-word show is what a prefix ladder is for, so there is no
+  // score here that should talk the ladder out of it.
+  // The direction matters, and getting it wrong turned the penalty into a
+  // bonus: a two-word candidate against a one-word result computed
+  // 0.9 - 0.2 * (1 - 2) and scored 1.1, outside the documented 0 to 1.
+  // A longer result means the candidate is a shortened prefix, which the ladder
+  // produced on purpose. A shorter result means the candidate overshot, and
+  // earns no bonus for it.
+  // …and the whole candidate, not just its first word. Matching on one token
+  // made "One Pace" a 0.83 match for "One Piece: Clockwork", because both start
+  // with "one" even though the second word disagrees; comparing the leading run
+  // sends that one down to the spelling check below.
+  var shared2 = 0;
+  while (shared2 < qs.length && shared2 < ns.length && qs[shared2] === ns[shared2]) shared2++;
+  if (shared2 === qs.length) {
+    // Every candidate word matched in order, so the candidate is a shortened
+    // prefix of the real title: "Severance" for "Severance: The Office". That
+    // is what the ladder is for, so it always wins, discounted only by how much
+    // extra name came back.
+    //
+    // qs cannot be longer than ns here: the loop above only completes if it ran
+    // out of result tokens last, so ns.length >= qs.length and the difference
+    // is never negative. An earlier version guarded against that with a ternary
+    // whose false branch was unreachable.
+    var extra = ns.length - qs.length;
+    return extra > 0 ? 0.9 - 0.2 * (extra / ns.length) : 0.9;
+  }
+  // Token overlap, so "Office US" still matches "The Office US" without the
+  // articles getting in the way. Counted over de-duplicated sets: a repeated
+  // word used to be counted twice, which could push the ratio above 1 for a
+  // result like "Piece One One" against "One Piece".
+  var qset = {}, nset = {}, qn = 0, nn = 0, i, k;
+  for (i = 0; i < qs.length; i++) { k = "$" + qs[i]; if (!qset[k]) { qset[k] = 1; qn++; } }
+  for (i = 0; i < ns.length; i++) { k = "$" + ns[i]; if (!nset[k]) { nset[k] = 1; nn++; } }
+  var shared = 0;
+  for (k in qset) if (nset[k]) shared++;
+  var union = qn + nn - shared;
+  var jaccard = union ? shared / union : 0;
+  if (jaccard >= AUTO_MIN_SCORE) return jaccard;
+  // Too little in common to be the same name on token overlap alone. Before
+  // giving up, measure how close the two are character by character: fansubs
+  // routinely spell a series slightly wrong. The One Piece group calls itself
+  // "One Pace", scoring 0.33 on tokens, which would send the ladder
+  // straight past the right answer.
+  if (q.length >= 5 && n.length >= 5) {
+    var capped = Math.min(1, levSim(q, n) * 0.95);
+    return Math.max(jaccard, capped);
+  }
+  return jaccard;
+}
+
+// 1 = identical, 0 = nothing alike. Only ever called on short strings, so the
+// full matrix costs nothing worth avoiding.
+function levSim(a, b) {
+  if (a === b) return 1;
+  var m = a.length, n = b.length;
+  if (!m || !n) return 0;
+  var prev = [], cur = [], i, j;
+  for (j = 0; j <= n; j++) prev[j] = j;
+  for (i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (j = 1; j <= n; j++) {
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j - 1] + 1,
+        prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)
+      );
+    }
+    var swap = prev; prev = cur; cur = swap;
+  }
+  return 1 - prev[n] / Math.max(m, n);
+}
 
 function normalizeForMatch(s) {
   return String(s || "")
@@ -739,8 +1392,8 @@ function normalizeForMatch(s) {
 }
 
 // ── Title treatment (TMDB "logos") ─────────────────────────────────
-// TMDB carries the official title artwork — the KUNG FU PANDA / AVENGERS
-// style wordmarks — but not in the details response. It arrives via
+// TMDB carries the official title artwork (the KUNG FU PANDA / AVENGERS
+// style wordmarks) but not in the details response. It arrives via
 // `append_to_response=images`, so it costs no extra round trip.
 //
 // The array is a mess to pick from: for Fight Club it holds 26 entries
@@ -748,7 +1401,7 @@ function normalizeForMatch(s) {
 // variant) to 8.5 (a thin wordmark). Title treatments are the wide ones,
 // so anything squarer than 2.5:1 is rejected outright, then the best-rated
 // of what remains wins. Returns null when the title has no usable logo,
-// which is common — the caller falls back to text.
+// which is common, and the caller falls back to text.
 function pickLogo(images) {
   var logos = (images && images.logos) || [];
   var best = null, bestScore = -1;
@@ -768,22 +1421,22 @@ function pickLogo(images) {
   }
   // w780 keeps a wide wordmark crisp on Retina without pulling the
   // multi-megabyte original.
-  return best ? "https://image.tmdb.org/t/p/w780" + best.file_path : "";
+  return best ? IL + best.file_path : "";
 }
 
-// Turn a movie detail response into the shape saveSelection expects. Shared by
-// the ladder match and the IMDb lookup, which each fetch the detail themselves.
-function saveMovieDetail(d) {
-  if (!currentVideoUrl || !d || !d.title) { resetPanel(); return; }
-  saveSelection({
+// The one place a film record is built. It used to be written out twice, once
+// per route, and the copies had already drifted: one took the id from the detail
+// response and the other from the search result.
+function movieInfo(d) {
+  return {
     showTitle:  "Movie",
     epTitle:    d.title,
-    code:       (d.release_date || "").slice(0, 4),
+    // No `code` for a film: it held the year, and airDate already begins with
+    // the year, so the card rendered "2011 · 2011-06-03".
     airDate:    d.release_date || "",
-    isStream:   false,
     rating:     d.vote_average ? d.vote_average.toFixed(1) : "",
     overview:   d.overview || "",
-    posterUrl:  d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
+    posterUrl:  d.poster_path ? IW + d.poster_path : "",
     logoUrl:    pickLogo(d.images),
     // A film has no season, but the key has to exist so the staleness check
     // can tell an old entry from a film.
@@ -792,15 +1445,23 @@ function saveMovieDetail(d) {
     season:     null,
     episode:    null,
     isMovie:    true
-  });
+  };
+}
+
+// The detail response is in hand; save it. Shared by the ladder match, the
+// IMDb lookup and the manual pick, which each fetch it themselves.
+function saveMovieDetail(d, token) {
+  if (!currentVideoUrl || !d || !d.title) { resetPanel(); return; }
+  if (!tokenLive(token)) return;
+  saveSelection(movieInfo(d));
 }
 
 // Turn a matched movie into the same shape saveSelection expects.
-function applyAutoMovie(item) {
+function applyAutoMovie(item, token) {
   fetch("https://api.themoviedb.org/3/movie/" + item.id + "?api_key=" + TK + "&append_to_response=images")
     .then(function(r) { return r.json(); })
-    .then(saveMovieDetail)
-    .catch(function() { resetPanel(); });
+    .then(function(d) { saveMovieDetail(d, token); })
+    .catch(function() { if (tokenLive(token)) resetPanel(); });
 }
 
 // Identify the file that just opened, without the user touching anything.
@@ -809,36 +1470,92 @@ function applyAutoMovie(item) {
 function autoIdentify(url) {
   var parsed = parseFilename(url);
   if (!parsed || !TK) return false;
-  // Need an episode code, or a year to identify a film by. A name with
-  // neither is left for the manual search — unless it carries an IMDb id,
-  // which is enough on its own to identify a film.
-  if (!parsed.code && !parsed.isMovie && !parsed.imdbId) return false;
-  // Already searching this URL (sidebarReady re-emits fileChanged).
-  if (autoInFlight[url]) return true;
-  autoInFlight[url] = true;
+
+  // Already searching this URL, under the epoch that started the current
+  // lookup. A duplicate fileChanged must leave the lookup alone, so nothing is
+  // cancelled and no epoch is burned here. The value is the token rather than a
+  // bare true: entries outlive the lookup that made them whenever it is
+  // abandoned (the user played another file, or the pinned path never cleared
+  // one), and a plain flag left behind made that URL un-identifiable forever.
+  // Keying on the epoch lets a later visit see the stale entry, move past it and
+  // try again.
+  if (autoInFlight[url] && autoInFlight[url].epoch === lookupEpoch) return true;
+
+  // Claim this lookup before anything else can return early. The token has to
+  // exist before the pin branch below, which also starts async work: created
+  // after it, myToken would be undefined there and tokenLive(undefined) is
+  // true, leaving the pinned path with no guard at all.
+  var myToken = { epoch: ++lookupEpoch, url: url };
+  function live() { return tokenLive(myToken); }
+  // Only ever clears our own claim: a newer lookup for the same URL has already
+  // replaced it, and dropping that one would let a duplicate event double up.
+  function clearClaim() { if (autoInFlight[url] === myToken) delete autoInFlight[url]; }
+  autoInFlight[url] = myToken;
   autoCancelTimer();
+
+  // A folder the user has already told us what it holds. This outranks
+  // everything: no search, no ladder, one request for the show itself.
+  var pin = pinForUrl(url);
+  if (pin && pin.show.tmdbId) {
+    touchPin(pin.dir);
+    applyPinnedShow(pin, parsed, myToken);
+    return true;
+  }
+
+  // Need something to search by: an episode code, a film's year, an IMDb id, or
+  // a series name recovered from a bracket group. A name with none of those is
+  // left for the manual search, which is deliberate: "Some Random Home Video"
+  // would otherwise cost three TMDB requests per playback to be told it is not
+  // on TMDB.
+  var hasSubject = parsed.code || parsed.absolute || parsed.isMovie ||
+                   parsed.imdbId ||
+                   (parsed.altTitles && parsed.altTitles.strong.length);
+  if (!hasSubject) {
+    // Nothing to search for, so this lookup is over before it began.
+    clearClaim();
+    return false;
+  }
 
   var panel = document.getElementById("panel");
   panel.innerHTML = '<div class="msg"><span class="sp"></span>Matching '
     + htmlEsc(parsed.fileName) + '…</div>';
 
-  var candidates = titleCandidates(parsed.title).slice(0, AUTO_MAX_TRIES);
+  // How many bracket-derived names to try before the filename's own title.
+  var MAX_ALT_TITLES = 2;
+
+  // A fansub's bracket group is the series, so those names go first; in a
+  // scene release the same slot is a release-group tag, so the filename's own
+  // title has to be tried before the single-word ones. titleScore settles
+  // which case a given filename is, which is why the ordering only decides how
+  // many queries get spent, not what gets picked.
+var alt = parsed.altTitles || { strong: [], weak: [] };
+  var candidates = [];
+  // De-duplicated across the sources. The filename's title is often already one
+  // of the bracket groups, and asking TMDB the same question twice costs a
+  // round trip and tells us nothing new.
+  [].concat(alt.strong.slice(0, MAX_ALT_TITLES),
+            titleCandidates(parsed.title),
+            alt.weak).forEach(function(c) {
+    if (candidates.indexOf(c) === -1) candidates.push(c);
+  });
+  candidates = candidates.slice(0, AUTO_MAX_TRIES);
   // Best plausible match seen so far, kept so that a ladder which finds
   // nothing better can still land instead of giving up.
   var bestSeen = null;
 
   function giveUp(msg) {
-    delete autoInFlight[url];
-    if (currentVideoUrl !== url || autoTimerId === null) return;
+    if (!live()) { clearClaim(); return; }
+    clearClaim();
     autoCancelTimer();
     panel.innerHTML = '<div class="msg">' + msg + '</div>';
   }
 
   function commit(item) {
     autoCancelTimer();
+    if (!live()) { clearClaim(); return; }
     document.getElementById("q").value = item.title || item.name || "";
-    if (parsed.isMovie) applyAutoMovie(item);
-    else applyAutoMatch(item, parsed.code);
+    if (parsed.isMovie) applyAutoMovie(item, myToken);
+    else applyAutoMatch(item, parsed.code, parsed.absolute, myToken);
   }
 
   // Try each candidate in turn; the first with results wins.
@@ -847,7 +1564,7 @@ function autoIdentify(url) {
       // Out of candidates. A weak earlier match still beats nothing, as long
       // as it named something at all.
       if (bestSeen && bestSeen.score >= AUTO_WEAK_SCORE) { commit(bestSeen.item); return; }
-      giveUp("No match for " + htmlEsc(parsed.fileName) + " — search above.");
+      giveUp("No match for " + htmlEsc(parsed.fileName) + ": search above.");
       return;
     }
     var endpoint = parsed.isMovie ? "search/movie" : "search/tv";
@@ -855,28 +1572,34 @@ function autoIdentify(url) {
     fetch("https://api.themoviedb.org/3/" + endpoint + "?api_key=" + TK + "&query=" + q)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        delete autoInFlight[url];
-        if (currentVideoUrl !== url || autoTimerId === null) return;
+        if (!live()) { clearClaim(); return; }
+        clearClaim();
         var list, pick;
 
-        if (parsed.isMovie) {
-          list = (data.results || []).filter(function(x) { return x.title; });
-          if (!list.length) return attempt(i + 1);
-          // A matching release year is a far stronger signal than votes —
-          // remakes share titles, so "Footloose 1984" must not pick 2011.
-          var year = String(parsed.year);
-          list.sort(function(a, b) {
-            var sa = (a.vote_count || 0) + ((a.release_date || "").slice(0, 4) === year ? 1e6 : 0);
-            var sb = (b.vote_count || 0) + ((b.release_date || "").slice(0, 4) === year ? 1e6 : 0);
-            return sb - sa;
-          });
-          pick = list[0];
-          // Only auto-accept a film when the year agrees or nothing else
-          // scored; guessing a remake would be worse than asking.
-          if ((pick.release_date || "").slice(0, 4) !== year && list.length > 1) {
-            return attempt(i + 1);
-          }
-        } else {
+if (parsed.isMovie) {
+            list = (data.results || []).filter(function(x) { return x.title; });
+            if (!list.length) return attempt(i + 1);
+            // A matching release year is a far stronger signal than votes, because
+            // remakes share titles, so "Footloose 1984" must not pick 2011. The name
+            // comes first of all: sorting on votes and the year alone picked "Star
+            // Wars" for "Star.Wars.Episode.IV.-.A.New.Hope.1977", because both were
+            // 1977 and the shorter title has more votes.
+            var year = String(parsed.year);
+            function filmRank(x) {
+              return titleScore(candidates[i], x.title) * 100 +
+                     (yearOf(x.release_date) === year ? 10 : 0) +
+                     Math.min(1, (x.vote_count || 0) / 10000);
+            }
+            list.sort(function(a, b) { return filmRank(b) - filmRank(a); });
+            pick = list[0];
+            // Only auto-accept a film when the name agrees and the year does too,
+            // or when there was nothing else: guessing a remake is worse than
+            // asking.
+            if ((titleScore(candidates[i], pick.title) < AUTO_MIN_SCORE ||
+                 yearOf(pick.release_date) !== year) && list.length > 1) {
+              return attempt(i + 1);
+            }
+          } else {
           list = (data.results || [])
             .filter(function(x) { return x.media_type !== "movie" && x.name; });
           if (!list.length) return attempt(i + 1);
@@ -901,13 +1624,13 @@ function autoIdentify(url) {
       })
       .catch(function() {
         // A network failure will hit every candidate; don't hammer TMDB.
-        giveUp("Lookup failed — search above.");
+        giveUp("Lookup failed. Search above.");
       });
   }
 
   // An IMDb id in the filename is a direct answer, so it is tried before the
   // ladder: one request instead of up to AUTO_MAX_TRIES, and no chance of
-  // picking a same-prefixed show. A miss here is not fatal — the ladder still
+  // picking a same-prefixed show. A miss here is not fatal: the ladder still
   // runs, so an id TMDB does not know costs one extra round trip and no
   // behaviour.
   function lookupImdb() {
@@ -919,12 +1642,12 @@ function autoIdentify(url) {
       + "?api_key=" + TK + "&append_to_response=images")
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        delete autoInFlight[url];
-        if (currentVideoUrl !== url || autoTimerId === null) return false;
+        if (!live()) { clearClaim(); return false; }
+        clearClaim();
         // An unknown id comes back as a 404 body with no id on it.
         if (!d || !d.id) return false;
-        if (asMovie) { autoCancelTimer(); saveMovieDetail(d); return true; }
-        applyShowDetail(d, parsed.code);
+        if (asMovie) { autoCancelTimer(); saveMovieDetail(d, myToken); return true; }
+        applyShowDetail(d, parsed.code, parsed.absolute, myToken);
         return true;
       })
       .catch(function() { return false; });
@@ -932,10 +1655,10 @@ function autoIdentify(url) {
 
   autoTimerId = setTimeout(function() {
     autoTimerId = null;
-    delete autoInFlight[url];
-    if (currentVideoUrl !== url) return;
+    if (!live()) return;
+    clearClaim();
     panel.innerHTML = '<div class="msg">Couldn\'t match '
-      + htmlEsc(parsed.fileName) + ' — search above.</div>';
+      + htmlEsc(parsed.fileName) + ': search above.</div>';
   }, AUTO_SEARCH_MS);
 
   if (parsed.imdbId) {
@@ -946,15 +1669,39 @@ function autoIdentify(url) {
   return true;
 }
 
+// An absolute episode number ("[1062-1063]") is not S01E1062. It is whichever
+// season's running total first reaches it. TMDB returns an episode_count per
+// season in the show response we already have, so the mapping is arithmetic
+// rather than another request.
+//
+// This assumes the source numbering lines up with TMDB's season splits, which
+// holds for most long-running series but is not guaranteed. When the total
+// falls outside every season, nothing is claimed.
+function locateAbsolute(show, absolute) {
+  if (!absolute) return null;
+  var seasons = (show.seasons || []).filter(function(s) { return s.season_number > 0; });
+  var seen = 0;
+  for (var i = 0; i < seasons.length; i++) {
+    var count = seasons[i].episode_count || 0;
+    if (!count) continue;
+    if (absolute <= seen + count) {
+      return { season: seasons[i].season_number, episode: absolute - seen };
+    }
+    seen += count;
+  }
+  return null;
+}
+
 // Wire the picker to a full show detail object, whichever route produced it:
 // /tv/{id} after a ladder match, or /tv/find/{imdb_id} when the filename
 // carries an IMDb id. Both return the same shape.
-function applyShowDetail(show, code) {
+function applyShowDetail(show, code, absolute, token) {
   if (!currentVideoUrl) return;
+  if (!tokenLive(token)) return;
   // A request that 404s still resolves, with a JSON body carrying no id. That
   // is not a match, and returning quietly would strand the panel on
-  // "Matching…" — the give-up timer was already cancelled by the time we get
-  // here — so fall back to the search prompt instead.
+  // "Matching…", because the give-up timer was already cancelled by the time
+  // we get here, so fall back to the search prompt instead.
   if (!show || !show.id) { resetPanel(); return; }
   selShow = show;
   selShow._name = show.name;
@@ -965,11 +1712,21 @@ function applyShowDetail(show, code) {
     episodes: show.number_of_episodes || null
   };
 
+  // No code from the filename? An absolute number can still be placed, by
+  // adding up the seasons. Failing that, open on the first season.
+  var located = code ? { season: code.season, episode: code.episode }
+                     : locateAbsolute(show, absolute);
+  var auto = located;
+
   // If the filename named a season the show doesn't have, fall back to
   // the closest real one rather than failing outright.
-  var wanted = code.season;
+  var wanted = located ? located.season
+                       : (selShow._seasons.length ? selShow._seasons[0].season_number : 1);
   var exists = selShow._seasons.some(function(s) { return s.season_number === wanted; });
   if (!exists && wanted > 1) wanted = 1;
+  // The episode belongs to the season we actually landed on, so it has to be
+  // re-derived when that season had to be substituted.
+  if (auto && auto.season !== wanted) auto = { season: wanted, episode: null };
   selSeason = wanted;
 
   // Build the same panel shape a manual pick produces, so the season and
@@ -984,47 +1741,66 @@ function applyShowDetail(show, code) {
     '<div class="sec"><div class="sl">Season</div><div class="pills">' + pills + '</div></div>' +
     '<div id="ep"></div>';
 
-  renderEps(wanted, code.episode);
+  // Without an episode to select, renderEps leaves the pills up and the panel
+  // waits for a click rather than guessing which one was meant.
+  renderEps(wanted, auto ? auto.episode : null, token);
+}
+
+// A pinned folder names its show, so there is nothing to search for: fetch
+// that show directly and let the filename decide only the episode. A folder
+// full of files the parser cannot read still resolves to the right series.
+function applyPinnedShow(pin, parsed, token) {
+  fetch("https://api.themoviedb.org/3/tv/" + encodeURIComponent(pin.show.tmdbId)
+    + "?api_key=" + TK + "&append_to_response=images")
+    .then(function(r) { return r.json(); })
+    .then(function(show) { applyShowDetail(show, parsed.code, parsed.absolute, token); })
+    .catch(function() { if (tokenLive(token)) resetPanel(); });
 }
 
 // Fetch the season list and select the parsed episode in one go.
-function applyAutoMatch(item, code) {
+function applyAutoMatch(item, code, absolute, token) {
   fetch("https://api.themoviedb.org/3/tv/" + item.id + "?api_key=" + TK + "&append_to_response=images")
     .then(function(r) { return r.json(); })
-    .then(function(show) { applyShowDetail(show, code); })
+    .then(function(show) { applyShowDetail(show, code, absolute, token); })
     .catch(function() {
-      resetPanel();
+      if (tokenLive(token)) resetPanel();
     });
 }
 
 // ── Remembered-URL map housekeeping ──────────────────────────────
-// Entries were never removed, so this map only ever grew — one per file
+// Entries were never removed, so this map only ever grew: one per file
 // ever opened, kept even after the file is deleted or renamed. Each entry
 // now carries a lastSeen stamp, refreshed every time its file is opened, and
 // anything untouched for six months is dropped at launch.
 //
 // Ageing rather than stat()ing is deliberate. iina.file.exists() would give an
-// exact answer but needs the file-system permission, which this fork dropped
-// along with the SubDL extraction path — and a disk-wide permission is not
-// worth re-adding to tidy a few kilobytes. A count cap was rejected too: it
+// exact answer but needs the file-system permission, and a disk-wide
+// permission is not worth re-adding to tidy a few kilobytes. A count cap was rejected too: it
 // evicts files that are still being watched, and because the entry is simply
 // gone the only symptom is a slightly slower card, which is the worst kind of
 // regression to have.
 var URL_MAP_MAX_AGE_DAYS = 180;
 var URL_MAP_MAX_AGE_MS = URL_MAP_MAX_AGE_DAYS * 86400000;
 
-function pruneUrlMap() {
-  var m = loadUrlMap(), keys = Object.keys(m), now = Date.now(), dropped = 0;
+// Drop entries that have not been touched in `maxAgeMs`. Returns the number
+// removed. Shared by the URL map and the folder map so both age identically.
+function dropStale(map, maxAgeMs, now) {
+  var keys = Object.keys(map), dropped = 0;
   for (var i = 0; i < keys.length; i++) {
-    var e = m[keys[i]];
+    var e = map[keys[i]];
     // Entries written before stamping existed have no lastSeen. Keep them:
     // treating a missing stamp as stale would wipe the user's history the
     // first time this ran.
-    if (e && typeof e.lastSeen === "number" && (now - e.lastSeen) > URL_MAP_MAX_AGE_MS) {
-      delete m[keys[i]];
+    if (e && typeof e.lastSeen === "number" && (now - e.lastSeen) > maxAgeMs) {
+      delete map[keys[i]];
       dropped++;
     }
   }
+  return dropped;
+}
+
+function pruneUrlMap() {
+  var m = loadUrlMap(), dropped = dropStale(m, URL_MAP_MAX_AGE_MS, Date.now());
   if (dropped) saveUrlMap(m);
   return dropped;
 }
@@ -1118,7 +1894,11 @@ function toggleDesc() {
 }
 
 function doClear() {
-  // user explicitly cleared — also forget this URL's saved identification
+  // Abort any lookup still in flight first. Without this a pending response
+  // sailed through the guards and called saveSelection again, so the card, the
+  // URL map and the overlay all came back after the user had deleted them.
+  invalidateLookups();
+  // user explicitly cleared: also forget this URL's saved identification
   // so re-playing it later doesn't auto-restore the old pick
   clearCurrentUrlFromMap();
   try{localStorage.removeItem("epinfo_ep");}catch(e){}
@@ -1138,24 +1918,41 @@ function setLoading(on) {
   document.getElementById("q").disabled  = on;
 }
 
-async function doSearch() {
+// A promise chain, not async/await: this is the only ES6+ syntax either web
+// view used, and a parse error here takes the whole sidebar script with it,
+// leaving a blank panel and no API-key form. Node's --check accepts async, so
+// the syntax test could not see it either; tests/syntax.test.mjs now rejects
+// it outright.
+function doSearch() {
   var q = (document.getElementById("q").value || "").trim();
   if (!q) return;
+  // The user is driving from here, so anything still in flight from the
+  // automatic lookup is stale. Without this it landed a moment later and
+  // replaced the results the user was looking at with a show they never chose.
+  invalidateLookups();
   pushSearch(q);
   setLoading(true);
   document.getElementById("panel").innerHTML =
     '<div class="msg"><span class="sp"></span>Searching…</div>';
-  try {
-    var r    = await fetch("https://api.themoviedb.org/3/search/multi?api_key=" + TK +
-      "&query=" + encodeURIComponent(q) + "&include_adult=false");
-    var data = await r.json();
+  fetch("https://api.themoviedb.org/3/search/multi?api_key=" + TK +
+    "&query=" + encodeURIComponent(q) + "&include_adult=false")
+    .then(function (r) { return r.json(); })
+    .then(function (data) { renderSearchResults(data); })
+    .catch(function () {
+      document.getElementById("panel").innerHTML = '<div class="msg">Search failed.</div>';
+    })
+    .then(function () { setLoading(false); });
+}
+
+function renderSearchResults(data) {
+  {
     var list = (data.results||[])
       .filter(function(x){ return x.media_type==="tv"||x.media_type==="movie"; })
       .slice(0,8);
 
     if (!list.length) {
       document.getElementById("panel").innerHTML = '<div class="msg">No results found.</div>';
-      setLoading(false); return;
+      return;
     }
 
     // FIX: Store search results in an array; onclick uses index only.
@@ -1164,7 +1961,7 @@ async function doSearch() {
     var html = "";
     list.forEach(function(item, i) {
       var title = item.title || item.name || "Untitled";
-      var year  = (item.release_date||item.first_air_date||"").slice(0,4);
+      var year  = yearOf(item.release_date || item.first_air_date);
       var img   = item.poster_path
         ? '<img class="rposter" src="'+IB+item.poster_path+'" />'
         : '<div class="rposter"></div>';
@@ -1178,10 +1975,7 @@ async function doSearch() {
 
     // Attach search cache to the panel so pickItemByIndex can reach it
     document.getElementById("panel")._searchCache = searchCache;
-  } catch(e) {
-    document.getElementById("panel").innerHTML = '<div class="msg">Search failed.</div>';
   }
-  setLoading(false);
 }
 
 // ── HTML escape helper ────────────────────────────────────────
@@ -1215,16 +2009,13 @@ function pickItem(item) {
     fetch("https://api.themoviedb.org/3/movie/"+item.id+"?api_key="+TK+"&append_to_response=images")
       .then(function(r){return r.json();})
       .then(function(d){
-        var info = { showTitle:"Movie", epTitle:d.title,
-          code: d.release_date?d.release_date.slice(0,4):"",
-          airDate:d.release_date||"", isStream:false,
-          rating:d.vote_average?d.vote_average.toFixed(1):"",
-          overview:d.overview||"",
-          posterUrl:d.poster_path ? "https://image.tmdb.org/t/p/w500" + d.poster_path : "",
-          logoUrl: pickLogo(d.images),
-          context: "",
-          tmdbId: String(item.id), season: null, episode: null, isMovie: true };
+        if (!d || !d.title) {
+          document.getElementById("panel").innerHTML = '<div class="msg">Failed to load.</div>';
+          return;
+        }
+        var info = movieInfo(d);
         saveSelection(info);
+        rememberFolderPin(info);   // a no-op for films, by design
       }).catch(function(){
         document.getElementById("panel").innerHTML='<div class="msg">Failed to load.</div>';
       });
@@ -1236,6 +2027,12 @@ function pickItem(item) {
   fetch("https://api.themoviedb.org/3/tv/"+item.id+"?api_key="+TK+"&append_to_response=images")
     .then(function(r){return r.json();})
     .then(function(show){
+      // The same dead end applyShowDetail guards against: an error body has no
+      // seasons, which rendered a "Season" heading over zero pills.
+      if (!show || !show.seasons) {
+        resetPanel();
+        return;
+      }
       selShow._name    = show.name;
       selShow._seasons = (show.seasons||[]).filter(function(s){return s.season_number>0;});
       showLogoUrl      = pickLogo(show.images);
@@ -1266,20 +2063,29 @@ function renderSeasons() {
 function pickSeason(n){ selSeason=n; renderSeasons(); }
 
 // autoEp: when set, the episode is picked automatically as soon as the list
-// loads — this is what the filename-detection path uses.
-function renderEps(sNum, autoEp) {
+// loads. This is what the filename-detection path uses.
+function renderEps(sNum, autoEp, token) {
   var el = document.getElementById("ep");
   if (!el) return;
   el.innerHTML = '<div class="msg"><span class="sp"></span>Loading episodes…</div>';
   fetch("https://api.themoviedb.org/3/tv/"+selShow.id+"/season/"+sNum+"?api_key="+TK)
     .then(function(r){return r.json();})
     .then(function(s){
+      if (!tokenLive(token)) return;
+      // A season that 404s, or an auth failure, resolves with a body carrying
+      // no episodes. Rendering "Episode" above an empty pill row is a dead
+      // end with no way out, so say so instead. Tested on the field actually
+      // used below, not on an id nothing reads.
+      if (!s || !s.episodes) {
+        el.innerHTML = '<div class="msg">Couldn\'t load that season. Search again above.</div>';
+        return;
+      }
       // Store season poster for overlay
       seasonPosterUrl = s.poster_path
-        ? "https://image.tmdb.org/t/p/w500" + s.poster_path
-        : (selShow && selShow.poster_path ? "https://image.tmdb.org/t/p/w500" + selShow.poster_path : "");
+        ? IW + s.poster_path
+        : (selShow && selShow.poster_path ? IW + selShow.poster_path : "");
       // FIX: Cache episodes in a plain JS array. Buttons use integer
-      // indices only — no JSON or encoding in onclick attributes.
+      // indices only, with no JSON or encoding in onclick attributes.
       // Previously, ep.name/ep.overview with " characters would corrupt
       // the onclick HTML and silently disable specific episode buttons.
       episodeCache = s.episodes || [];
@@ -1297,17 +2103,26 @@ function renderEps(sNum, autoEp) {
 
       if (autoEp) {
         for (var i = 0; i < episodeCache.length; i++) {
-          if (episodeCache[i].episode_number === autoEp) { pickEp(i); return; }
+          if (episodeCache[i].episode_number === autoEp) { pickEp(i, true); return; }
         }
         // Episode not in this season (bad parse, or season mismatch).
         // Leave the pills up so the user can correct it in one click.
         el.innerHTML = '<div class="msg" style="padding:6px 0">'
           + htmlEsc(selShow._name || "") + ' has no episode '
           + htmlEsc(String(autoEp)) + ' in season ' + htmlEsc(String(sNum))
-          + ' — pick below.</div>' +
+          + ': pick below.</div>' +
           '<div class="sec" style="margin-top:8px"><div class="pills">'+pills+'</div></div>';
       }
-    }).catch(function(){ el.innerHTML='<div class="msg">Failed to load episodes.</div>'; });
+    }).catch(function(){
+      if (!tokenLive(token)) return;
+      el.innerHTML='<div class="msg">Failed to load episodes.</div>';
+    });
+}
+
+// The release year out of a TMDB date string, used wherever one is needed.
+function yearOf(dateStr) {
+  var m = /(19|20)\d{2}/.exec(String(dateStr || ""));
+  return m ? m[0] : "";
 }
 
 function epCode(s, e) {
@@ -1336,11 +2151,22 @@ function seriesContext(sNum, ep) {
 }
 
 // FIX: pickEp now takes an integer index, not an encoded JSON string.
-function pickEp(idx) {
+// `auto` marks a pick the plugin made for itself rather than one the user
+// clicked. Only a click counts as evidence the user endorses the pairing, so
+// only a click is allowed to pin a folder.
+function pickEp(idx, auto) {
   var ep = episodeCache[idx];
   if (!ep) return;
+  // selShow is cleared on every file change, so a season response that lands
+  // late can reach here with nothing to describe. Previously that threw, and
+  // the rejection was absorbed by renderEps' catch, which turned a real bug
+  // into silence.
+  if (!selShow) return;
+  // Captured now rather than read from the module later: a response that
+  // arrives after the user has moved on must not act on the new file. (The
+  // staleness itself is checked by renderEps, before this is ever reached.)
+  var pickDir = currentParsed && currentParsed.titleDir;
   var info = {
-    isStream:  false,
     showTitle: selShow._name||selShow.name||"",
     epTitle:   ep.name||("Episode "+ep.episode_number),
     code:      epCode(selSeason, ep.episode_number),
@@ -1348,11 +2174,70 @@ function pickEp(idx) {
     airDate:   ep.air_date||"",
     rating:    ep.vote_average?ep.vote_average.toFixed(1):"",
     overview:  ep.overview||"",
-    posterUrl: seasonPosterUrl || (selShow && selShow.poster_path ? "https://image.tmdb.org/t/p/w500" + selShow.poster_path : ""),
+    posterUrl: seasonPosterUrl || (selShow && selShow.poster_path ? IW + selShow.poster_path : ""),
     logoUrl: showLogoUrl,
     tmdbId: String(selShow.id), season: selSeason, episode: ep.episode_number, isMovie: false
   };
   saveSelection(info);
+  if (!auto) rememberFolderPin(info, pickDir);
+}
+
+// Record "this directory is that show", so every other file in it stops
+// needing the guesswork. Called from manual picks only: an automatic match is
+// not evidence the user would have chosen it, and a wrong pin would then apply
+// to every remaining file in the folder.
+function rememberFolderPin(info, dir) {
+  if (!info || info.isMovie) return;
+  try {
+    if (localStorage.getItem("epinfo_pin_remember") === "false") return;
+  } catch (e) { return; }
+  // Only a directory that supplied the title is worth pinning. In a flat
+  // library the parent is usually the whole media folder, and pinning that to
+  // one show would be actively wrong. The directory is passed in by the caller
+  // rather than read from the module, so a late response cannot pin whatever
+  // folder happens to be playing now.
+  if (!dir) return;
+  var m = loadFolderMap();
+  m[dir] = {
+    tmdbId: String(info.tmdbId || ""),
+    name: info.showTitle || "",
+    season: info.season,
+    lastSeen: Date.now()
+  };
+  saveFolderMap(m);
+  paintPinState();
+}
+
+// Reflect the pin, if any, for the file that is playing now.
+function paintPinState() {
+  var el = document.getElementById("pin-state");
+  if (!el) return;
+  var pin = currentVideoUrl ? pinForUrl(currentVideoUrl) : null;
+  if (!pin) { el.style.display = "none"; el.innerHTML = ""; return; }
+  el.style.display = "block";
+  el.innerHTML = '<span class="pin-lbl">Folder pinned to <b>' + htmlEsc(pin.show.name || "?")
+    + '</b></span>'
+    + '<button class="pin-x" onclick="doUnpinFolder()" title="Forget this folder">\u2715</button>';
+}
+
+function doUnpinFolder() {
+  invalidateLookups();
+  var pin = currentVideoUrl ? pinForUrl(currentVideoUrl) : null;
+  if (pin) unpinFolder(pin.dir);
+  paintPinState();
+  // Forget the identification too, so the very next play re-derives it rather
+  // than replaying the pick the pin was standing in for.
+  clearCurrentUrlFromMap();
+  try { localStorage.removeItem("epinfo_ep"); } catch (e) {}
+  document.getElementById("saved").classList.remove("on");
+  selShow = null; selSeason = null; episodeCache = []; showTotals = null;
+  iina.postMessage("clearEpisode", {});
+  resetPanel();
+  autoIdentify(currentVideoUrl);
+}
+
+function doSetPinRemember(on) {
+  try { localStorage.setItem("epinfo_pin_remember", on ? "true" : "false"); } catch (e) {}
 }
 
 function saveSelection(info) {
@@ -1397,32 +2282,45 @@ iina.onMessage("overlayStatus", function(d){
   if(el) el.textContent = d.text||"";
 });
 // ── File changed ──────────────────────────────────────────────
-// URL-aware. A URL we've already identified restores instantly — but only
+// URL-aware. A URL we've already identified restores instantly, but only
 // if the remembered episode still agrees with the filename. A stale entry
 // (typically a mis-pick saved against the wrong file) is re-identified
 // rather than silently replayed.
 iina.onMessage("fileChanged", function(d){
-  currentVideoUrl = (d && d.url) || "";
-  autoCancelTimer();
+  var nextUrl = (d && d.url) || "";
+  // A repeat of the message for the file already playing is a no-op, and it
+  // has to be: main.js re-sends this on the sidebar-ready handshake. Returning
+  // here is what leaves the in-flight lookup's timer and its eventual result
+  // intact. Treating it as a fresh event cancelled the timer, and the lookup
+  // then abandoned its own result because the timer it was waiting on had
+  // gone, so the file silently failed to identify.
+  if (nextUrl === currentVideoUrl) return;
+  currentVideoUrl = nextUrl;
+  invalidateLookups();
 
   // Reset search panel state regardless
   document.getElementById("q").value = "";
   selShow = null; selSeason = null; episodeCache = []; resetPanel();
+  paintPinState();
 
   var map   = loadUrlMap();
   var saved = currentVideoUrl ? map[currentVideoUrl] : null;
+
+  // Parsed unconditionally, not only when there is something cached: the pin
+  // writer needs to know which directory supplied the title, and a lazy parse
+  // would leave it working from whichever file happened to be parsed last.
+  var now = parseFilename(currentVideoUrl);
 
   // The filename is ground truth for season/episode, and for a film's year;
   // the cache is only authoritative about which show it is.
   var stale = false;
   if (saved) {
-    var now = parseFilename(currentVideoUrl);
     if (now && now.code) {
       stale = Number(saved.season || 0)  !== now.code.season ||
               Number(saved.episode || 0) !== now.code.episode;
     } else if (now && now.isMovie && saved.isMovie) {
       // A film identified under a different year is the wrong film.
-      stale = String(saved.airDate || saved.code || "").slice(0, 4) !== String(now.year);
+      stale = yearOf(saved.airDate || saved.code) !== yearOf(now.year);
     } else if (now && now.isMovie && !saved.isMovie) {
       stale = true;   // an episode identification on a film
     }
@@ -1432,20 +2330,20 @@ iina.onMessage("fileChanged", function(d){
     // genuinely no logo refreshes only this one time.
     if (saved.logoUrl === undefined) stale = true;
     // Same for the series context line, added later. Both writers now always
-    // store the key — a film stores an empty string, exactly as it does for
-    // logoUrl — so an absent key means only one thing: an entry written
+    // store the key. A film stores an empty string, exactly as it does for
+    // logoUrl, so an absent key means only one thing: an entry written
     // before the field existed.
     if (saved.context === undefined) stale = true;
   }
 
   if (saved && !stale) {
-    // URL is already identified and still correct — restore silently.
+    // URL is already identified and still correct, so restore it silently.
     try { localStorage.setItem("epinfo_ep", JSON.stringify(saved)); } catch(e) {}
     saveCurrentUrlInfo(saved);   // refresh lastSeen so it never ages out
     showSaved(saved);
     iina.postMessage("episodeSelected", saved);
   } else if (!autoIdentify(currentVideoUrl)) {
-    // Nothing usable in the filename — fall back to a manual prompt.
+    // Nothing usable in the filename, so fall back to a manual prompt.
     try { localStorage.removeItem("epinfo_ep"); } catch(e) {}
     document.getElementById("saved").classList.remove("on");
     iina.postMessage("clearEpisode", {});
@@ -1454,6 +2352,11 @@ iina.onMessage("fileChanged", function(d){
 });
 
 // ── API Key ───────────────────────────────────────────────────
+(function initPinRemember() {
+  var el = document.getElementById("pin-remember");
+  if (el) el.checked = localStorage.getItem("epinfo_pin_remember") !== "false";
+})();
+
 (function initApiKey() {
   var key = localStorage.getItem("epinfo_tmdb_key") || "";
   if (key) {
@@ -1495,14 +2398,14 @@ function doSaveKey() {
         msg.style.color="#30d158"; msg.textContent="✓ Valid key saved!";
         setTimeout(showApiOk, 700);
       } else {
-        msg.style.color="#ff453a"; msg.textContent="✗ Invalid key — please check and retry.";
+        msg.style.color="#ff453a"; msg.textContent="✗ Invalid key, please check and retry.";
       }
     })
     .catch(function(){
       localStorage.setItem("epinfo_tmdb_key", key);
       iina.postMessage("setTmdbKey", { key: key });
       TK = key;
-      msg.style.color="#ff9f0a"; msg.textContent="⚠ Saved (couldn’t verify — no network)";
+      msg.style.color="#ff9f0a"; msg.textContent="⚠ Saved (couldn’t verify: no network)";
       setTimeout(showApiOk, 1200);
     });
 }
@@ -1570,7 +2473,13 @@ function paintThemePills(t) {
     pills[i].className = "thm" + (pills[i].getAttribute("data-t") === t ? " on" : "");
   }
 }
+// The three themes, named once. The overlay whitelists them too and falls back
+// to classic, but an unknown value used to be persisted and left persisted, so
+// a stale name could sit in storage across restarts.
+var THEMES = { classic: 1, compact: 1, poster: 1 };
+
 function doSetTheme(t) {
+  if (!THEMES[t]) t = "classic";
   try { localStorage.setItem("epinfo_overlay_theme", t); } catch(e) {}
   paintThemePills(t);
   iina.postMessage("setOverlayTheme", { value: t });
@@ -1609,9 +2518,15 @@ function doRefreshSkip() {
 }
 
 iina.onMessage("skipResult", function(d) {
+  // Every answer re-enables the button, including the ones that arrive from a
+  // lookup the user has already moved past.
   var btn = document.getElementById("skip-refresh");
   if (btn) { btn.disabled = false; btn.textContent = "Search again"; }
   if (!d) return;
+  // A superseded run reports nothing at all. Treating it as "no segments" said
+  // the episode had none and consumed the single "you asked for this" flag, so
+  // the real answer that arrived a moment later was thrown away.
+  if (d.stale) return;
   // Only speak up when the user asked; a silent success needs no commentary.
   if (skipUserAsked) {
     showSkipMsg(d.count ? d.label : "Nothing found for this episode.");
@@ -1632,8 +2547,10 @@ function doToggleSkip(on) {
 var SEARCHES_CAP = 5;
 
 function loadSearches() {
-  try { return JSON.parse(localStorage.getItem("epinfo_searches") || "[]"); }
-  catch(e) { return []; }
+  try {
+    var v = JSON.parse(localStorage.getItem("epinfo_searches") || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch(e) { return []; }
 }
 function pushSearch(q) {
   q = String(q || "").trim();
@@ -1673,17 +2590,28 @@ function renderSearches() {
 var RECENTS_CAP = 5;
 
 function loadRecents() {
-  try { return JSON.parse(localStorage.getItem("epinfo_recents") || "[]"); }
-  catch(e) { return []; }
+  // The shape is checked, not just the parse. A hand-edited or truncated value
+  // that parses to an object used to throw in sortedRecents, and because that
+  // ran inside the boot timer the throw also skipped sidebarReady, so main.js
+  // never re-emitted fileChanged and per-URL restore died for the session.
+  try {
+    var v = JSON.parse(localStorage.getItem("epinfo_recents") || "[]");
+    if (!Array.isArray(v)) return [];
+    return v.filter(function (r) { return r && typeof r === "object" && r.info; });
+  } catch(e) { return []; }
 }
 function saveRecents(list) {
   try { localStorage.setItem("epinfo_recents", JSON.stringify(list)); } catch(e) {}
 }
+// Identity of a recent pick, for de-duplication. Keyed on the show alone, not
+// the episode: Recent Picks is a list of shows you can re-apply, so watching a
+// second episode of something already there should refresh the existing entry
+// rather than add a near-duplicate. It used to include season and episode, so
+// every episode of a series accumulated its own row and the pin was lost on the
+// next one.
 function recentKey(info) {
   if (!info) return "";
-  return info.isMovie
-    ? "m" + info.tmdbId
-    : "t" + info.tmdbId + "-" + (info.season || 0) + "-" + (info.episode || 0);
+  return (info.isMovie ? "m" : "t") + info.tmdbId;
 }
 function pushRecent(info) {
   if (!info || !info.tmdbId) return;
@@ -1778,7 +2706,7 @@ function renderRecents() {
   for (var i = 0; i < items.length; i++) {
     var info = items[i].info || {};
     var sub  = info.isMovie
-      ? "Movie" + (info.airDate ? " · " + htmlEsc(String(info.airDate).slice(0, 4)) : "")
+      ? "Movie" + (info.airDate ? " · " + htmlEsc(yearOf(info.airDate)) : "")
       : (info.code ? htmlEsc(info.code) : "") + (info.epTitle ? " · " + htmlEsc(info.epTitle) : "");
     var img  = info.posterUrl ? "background-image:url('" + htmlEsc(info.posterUrl) + "')" : "";
     html += '<div class="rc" onclick="applyRecent(' + i + ')">' +
@@ -1806,7 +2734,7 @@ function renderRecents() {
     var n = v !== null ? parseFloat(v) : 3;
     if (!isNaN(n)) iina.postMessage("setPauseDelay", { value: n });
 
-    // TMDB key — main.js needs it to resolve the IMDB id that the skip
+    // TMDB key. main.js needs it to resolve the IMDB id that the skip
     // databases are keyed on.
     iina.postMessage("setTmdbKey", { key: localStorage.getItem("epinfo_tmdb_key") || "" });
 
@@ -1815,7 +2743,7 @@ function renderRecents() {
     paintThemePills(th);
     iina.postMessage("setOverlayTheme", { value: th });
 
-    // Skip intro — opt-in, so default off
+    // Skip intro, opt-in so off by default
     var sk = localStorage.getItem("epinfo_skip_enabled") === "true";
     paintSkipToggle(sk);
     iina.postMessage("setSkipEnabled", { enabled: sk });
@@ -1824,8 +2752,11 @@ function renderRecents() {
     pruneRecents();
     renderRecents();
     pruneUrlMap();
+    // The folder map ages identically. Without this it was the one map that
+    // only ever grew, holding pins for folders that no longer exist.
+    pruneFolderMap();
 
-    // All settings have been pushed — tell main.js it's safe to re-emit
+    // All settings have been pushed, so tell main.js it is safe to re-emit
     // fileChanged so we can do the per-URL TMDB restore.
     // The original fileChanged from iina.file-loaded may have arrived
     // before our handlers were registered.
@@ -1847,7 +2778,7 @@ iina.onMessage("overlayShowing", function(d) {
 });
 </script>
 <script>
-// Collapsible sidebar sections — remember open/closed state across launches.
+// Collapsible sidebar sections, remembering open/closed state across launches.
 (function () {
   var live = {};
   document.querySelectorAll("details.sub-sec").forEach(function (d) {
@@ -1860,10 +2791,10 @@ iina.onMessage("overlayShowing", function(d) {
     });
   });
 
-  // Drop stored state for sections that no longer exist. The three subtitle
-  // sections were removed from this fork, but the keys they wrote persist.
-  // The live set is derived from the DOM, so this stays correct if sections
-  // are added or removed again.
+  // Drop stored state for sections that no longer exist. Keys written by a
+  // section that has since been removed still sit in localStorage, and are
+  // pruned here. The live set is derived from the DOM, so this stays correct
+  // if sections are added or removed again.
   try {
     var dead = [];
     for (var i = 0; i < localStorage.length; i++) {

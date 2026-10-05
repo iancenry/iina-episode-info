@@ -14,7 +14,7 @@
     pointer-events:none;
     /* Match original font stack exactly */
     font-family:'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif;
-    /* Fix the "outline" look on macOS — WebKit subpixel AA on dark backgrounds
+    /* Fix the "outline" look on macOS, where WebKit subpixel AA on dark backgrounds
        causes text to look like it has a white stroke. Antialiased removes it. */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -39,7 +39,7 @@
 
   /* ── Title treatment ──────────────────────────────────────────
      TMDB's official wordmark, shown instead of the show-name line. For a
-     film it stands in for the title entirely. object-fit:contain matters —
+     film it stands in for the title entirely. object-fit:contain matters
      many logos are uploaded with wide transparent margins, and without it
      the wordmark renders tiny. */
   #logo {
@@ -74,19 +74,12 @@
   .mt span+span::before { content:' · '; color:rgba(255,255,255,0.3); margin:0 6px; }
   .rat { color:#f5c518; font-weight:600; }
   /* Series context: where this episode sits and when the next one lands.
-     Quieter than the meta row — it is reference, not the headline. */
+     Quieter than the meta row because it is reference, not the headline. */
   .cx {
     font-size:13px; color:rgba(255,255,255,0.4);
     margin:-8px 0 14px; line-height:1.4;
   }
   .cx:empty { display:none; }
-  /* TMDB requires the notice to be shown wherever their data appears, which
-     includes this card rather than only the README. */
-  .attr {
-    flex:0 0 100%;
-    font-size:10px; color:rgba(255,255,255,0.28);
-    margin-top:4px; letter-spacing:.02em;
-  }
   .ov {
     font-size:16px; color:rgba(255,255,255,0.65);
     line-height:1.6;
@@ -99,6 +92,11 @@
     flex-shrink:0; width:14vw; max-width:200px; min-width:110px;
     align-self:center;
   }
+  /* Cleared via innerHTML when there is no poster, but a flex item with a
+     definite width is given that width regardless of content, so the empty
+     box still reserved 110-200px. In poster theme it sat on the left of a
+     row-reverse flex line, which visibly off-centred the text. */
+  #poster:empty { display: none; }
   #poster img {
     width:100%; border-radius:8px; display:block;
     box-shadow:0 6px 28px rgba(0,0,0,0.7);
@@ -152,6 +150,12 @@
      scale rather than a header above it. */
   #wrap[data-logo="movie"] #logo { margin-bottom: 14px; }
   #wrap[data-logo="movie"] #logo img { max-height: 62px; }
+  /* Declared after the movie rules on purpose. Both selectors have the same
+     specificity, so source order decides, and the movie rule came second: a
+     film in compact theme got the 62px sizing. Since a film hides both text
+     lines, that oversized wordmark was the entire title. */
+  #wrap[data-theme="compact"][data-logo="movie"] #logo { margin-bottom: 5px; }
+  #wrap[data-theme="compact"][data-logo="movie"] #logo img { max-height: 22px; }
 
   /* ── Skip pill ─────────────────────────────────────────────────
      Independent of the info card: it must be able to show while the
@@ -186,6 +190,12 @@
      rather than to a span inside it. */
   #skip-btn > * { pointer-events:none; }
   @keyframes skipIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  /* The pill appears on every episode, so the slide runs over and over. Someone
+     who has asked the system for less motion should not get it. */
+  @media (prefers-reduced-motion: reduce) {
+    #skip-btn { animation:none; transition:none; }
+    #skip-btn:hover { transform:none; }
+  }
 </style>
 </head>
 <body>
@@ -202,10 +212,6 @@
     </div>
 
     <div id="poster"></div>
-
-    <!-- flex-basis 100% wraps this onto its own line inside the shaded card,
-         rather than letting it sit beside the poster. -->
-    <div class="attr" id="attr"></div>
   </div>
 </div>
 
@@ -219,7 +225,7 @@
 
 <script>
 // ── Helper: HTML-escape text going into innerHTML ─────────────
-// Must escape ' as well as " — the poster <img> below interpolates into a
+// Must escape ' as well as ". The poster <img> below interpolates into a
 // single-quoted attribute, so an unescaped ' would break out of it.
 function esc(s) {
   return String(s || "")
@@ -267,8 +273,8 @@ iina.onMessage("showData", function(d) {
   // Episode title
   document.getElementById("ep-title").textContent = d.epTitle || "";
 
-  // TMDB title treatment. When there is no usable logo — which is most of
-  // the time — nothing changes and the text lines stand on their own.
+  // TMDB title treatment. When there is no usable logo, which is most of
+  // the time, nothing changes and the text lines stand on their own.
   // Reset first, every time: a film hides the text lines, so without this a
   // show shown next would inherit the hidden state and lose its title.
   var logoEl = document.getElementById("logo");
@@ -282,16 +288,23 @@ iina.onMessage("showData", function(d) {
   wrapEl.removeAttribute("data-logo");
 
   if (d.logoUrl) {
-    logoEl.innerHTML = '<img src="' + esc(d.logoUrl) + '" alt="" />';
-    logoEl.style.display = "block";
-    // The wordmark IS the title, so the text line it replaces steps aside —
-    // otherwise the card prints the show name twice. For a film that is the
-    // big title as well as the placeholder "MOVIE" header.
-    nameEl.style.display = "none";
-    if (d.isMovie) {
-      titleEl.style.display = "none";
-      wrapEl.setAttribute("data-logo", "movie");
-    }
+    // The wordmark only takes the place of the text lines once it has actually
+    // loaded. TMDB wordmark URLs do rot, and before this a 404 hid both lines
+    // and left the card showing the alt text in a 62px box, which is the one
+    // card that must never be unreadable. onerror is the same as not loading.
+    //
+    // alt carries the title anyway, for the case where the image is there and
+    // simply not rendering.
+    if (d.isMovie) wrapEl.setAttribute("data-logo", "movie");
+    logoEl.innerHTML = '<img src="' + esc(d.logoUrl) + '" alt="' + esc(d.epTitle || d.showTitle || "") +
+      // Guarded on this image still being the one in the box. Clearing the
+      // element detaches the old image but does not cancel its load, and a
+      // detached image's load event still fires: the next card, which had no
+      // wordmark of its own, was left with an empty logo box and no title line.
+      '" onload="if(this.parentNode && this.parentNode.firstChild === this){' +
+      'document.getElementById(\'logo\').style.display=\'block\';' +
+      'document.getElementById(\'show-name\').style.display=\'none\';' +
+      (d.isMovie ? "document.getElementById('ep-title').style.display='none';" : "") + '}" />';
   }
 
   // Meta row: code · airDate · ★ rating
@@ -304,18 +317,13 @@ iina.onMessage("showData", function(d) {
   // Series context, empty for a film.
   document.getElementById("ctx-row").textContent = d.context || "";
 
-  // TMDB's required attribution, shown on the card because that is where their
-  // data is displayed.
-  document.getElementById("attr").textContent =
-    "Data from TMDB. Not endorsed or certified by TMDB.";
-
   // Overview
   document.getElementById("overview").textContent = d.overview || "";
 
   // Poster
   var posterEl = document.getElementById("poster");
   if (d.posterUrl) {
-    posterEl.innerHTML = "<img src='" + esc(d.posterUrl) + "' />";
+    posterEl.innerHTML = "<img src='" + esc(d.posterUrl) + "' alt='" + esc(d.epTitle || d.showTitle || "") + "' />";
   } else {
     posterEl.innerHTML = "";
   }

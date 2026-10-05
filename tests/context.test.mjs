@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadSidebar, loadOverlay, settle } from "./helpers/harness.mjs";
+import { readRepo } from "./helpers/extract.mjs";
 
 const KEY = { epinfo_tmdb_key: "TESTKEY" };
 
@@ -117,16 +118,23 @@ test("an entry saved before the context line existed re-identifies once", async 
   delete map[url].context;
   h.localStorage.setItem("epinfo_url_map", JSON.stringify(map));
 
+  // Leave and come back, rather than re-sending fileChanged for the same file:
+  // a duplicate for the file already playing is now a deliberate no-op.
+  const revisit = async () => {
+    h.iina._emit("fileChanged", { url: "file:///v/Another File.mkv" });
+    await settle();
+    h.iina._emit("fileChanged", { url });
+    await settle();
+  };
+
   const before = h.fetchCalls.length;
-  h.iina._emit("fileChanged", { url });
-  await settle();
+  await revisit();
   assert.ok(h.fetchCalls.length > before, "the old entry was replayed instead of upgraded");
   assert.match(selected(h).context, /Episode 3 of 3/, "the upgraded entry has no context line");
 
   // And it settles: the upgraded entry must not be considered stale again.
   const afterUpgrade = h.fetchCalls.length;
-  h.iina._emit("fileChanged", { url });
-  await settle();
+  await revisit();
   assert.equal(h.fetchCalls.length, afterUpgrade, "the upgraded entry is stale every single time");
 });
 
@@ -151,14 +159,62 @@ test("a film entry is not re-identified on every open", async () => {
   assert.equal(h.fetchCalls.length, afterFirst, "the film was re-fetched on re-open");
 });
 
-test("the card carries TMDB's required attribution", () => {
-  const o = loadOverlay();
-  o.iina._emit("showData", { showTitle: "Severance", epTitle: "In Perpetuity" });
-  const attr = o.document.getElementById("attr").textContent;
-  assert.match(attr, /TMDB/);
-  assert.match(attr, /not endorsed or certified/i);
+test("TMDB's attribution lives in the sidebar, not on the card", () => {
+  // Static markup, so this asserts on the source rather than on a rendered
+  // element: the harness's document is a stub and never parses HTML.
+  const sidebar = readRepo("sidebar.html");
+  const overlay = readRepo("overlay.html");
+  assert.match(sidebar, /Not endorsed or certified by TMDB/);
+  // Comments in the overlay still mention TMDB (the wordmark is TMDB's), so
+  // this checks for the rendered notice rather than the word.
+  assert.doesNotMatch(overlay, /Not endorsed/,
+    "the overlay card should carry no attribution wording");
+  assert.doesNotMatch(overlay, /id="attr"/, "the attribution element is still on the card");
 
-  // It is shown unconditionally: the data is on screen either way.
-  o.iina._emit("showData", { showTitle: "Movie", epTitle: "Fight Club", isMovie: true });
-  assert.match(o.document.getElementById("attr").textContent, /TMDB/);
+  // The full notice still has to exist somewhere for the terms.
+  assert.match(readRepo("README.md"), /not endorsed or certified by TMDB/i);
+});
+// ── Overlay layout and fallbacks ────────────────────────────────────
+
+test("a film's wordmark is sized for the compact theme", () => {
+  const o = loadOverlay();
+  o.iina._emit("showData", {
+    theme: "compact", isMovie: true, logoUrl: "https://image.tmdb.org/t/p/w780/l.png",
+    epTitle: "Heat", showTitle: "Movie"
+  });
+  const wrap = o.document.getElementById("wrap");
+  assert.equal(wrap.attributes["data-theme"], "compact");
+  assert.equal(wrap.attributes["data-logo"], "movie");
+  // The wordmark is the only title a film shows, so it must not be sized by
+  // the movie rule and overflow a compact card.
+  assert.match(readRepo("overlay.html"),
+    /\[data-theme="compact"\]\[data-logo="movie"\] #logo img \{ max-height: 22px; \}/);
+});
+
+test("an absent poster collapses instead of reserving a gap", () => {
+  const o = loadOverlay();
+  o.iina._emit("showData", { showTitle: "Severance", epTitle: "Ep", posterUrl: "" });
+  assert.equal(o.document.getElementById("poster").innerHTML, "");
+  assert.match(readRepo("overlay.html"), /#poster:empty \{ display: none; \}/);
+});
+
+test("the logo and poster carry the title as alt text", () => {
+  const o = loadOverlay();
+  o.iina._emit("showData", {
+    isMovie: true, logoUrl: "https://image.tmdb.org/t/p/w780/l.png",
+    posterUrl: "https://image.tmdb.org/t/p/w500/p.jpg",
+    epTitle: "Heat", showTitle: "Movie"
+  });
+  // A film hides both text lines, so a failed image would otherwise leave the
+  // card with nothing naming the film.
+  assert.match(o.document.getElementById("logo").innerHTML, /alt="Heat"/);
+  assert.match(o.document.getElementById("poster").innerHTML, /alt='Heat'/);
+});
+
+test("a film no longer prints its year twice", () => {
+  const sidebar = readRepo("sidebar.html");
+  // `code` held the year and airDate began with the year, so the meta row read
+  // "2011 · 2011-06-03".
+  assert.doesNotMatch(sidebar, /code:\s*\(d\.release_date \|\| ""\)\.slice/);
+  assert.doesNotMatch(sidebar, /code: d\.release_date\?d\.release_date\.slice/);
 });

@@ -20,7 +20,14 @@ function makeElement(id) {
     offsetWidth: 0,
     scrollHeight: 0,
     clientHeight: 0,
-    style: {},
+    // A real CSSStyleDeclaration, not a bare object. The overlay writes
+    // custom properties through setProperty, and a stub without it throws,
+    // which had made the real showData payload untestable.
+    style: {
+      setProperty(k, v) { this[k] = v; },
+      removeProperty(k) { delete this[k]; },
+      getPropertyValue(k) { return this[k] || ""; }
+    },
     dataset: {},
     attributes: {},
     classList: {
@@ -125,9 +132,16 @@ function makeFetch(routes, calls) {
     if (typeof routes === "function") {
       body = routes(String(url));
     } else {
-      for (const [needle, value] of Object.entries(routes || {})) {
-        if (String(url).includes(needle)) { body = value; break; }
+      // Longest match wins, not first. "/3/tv/9999" is a substring of
+      // "/3/tv/9999/season/1", so first-match would hand a season request the
+      // show object whenever the shorter key happened to be declared first.
+      let best = null;
+      for (const needle of Object.keys(routes || {})) {
+        if (String(url).includes(needle) && (!best || needle.length > best.length)) {
+          best = needle;
+        }
       }
+      if (best !== null) body = routes[best];
     }
     if (body === undefined) {
       return Promise.resolve({
@@ -139,7 +153,20 @@ function makeFetch(routes, calls) {
         })
       });
     }
-    const payload = typeof body === "function" ? body(String(url)) : body;
+    // A route may reject, to model a real network failure: offline, DNS
+    // failure, a dropped connection. Without this every `.catch()` in the
+    // plugin was unreachable from a test, because the stub could only ever
+    // resolve. Wrapped in try/catch because a route function that throws
+    // would otherwise propagate synchronously out of the caller instead of
+    // becoming a rejection, which is not what the product does.
+    try {
+      const resolved = typeof body === "function" ? body(String(url)) : body;
+      if (resolved instanceof Error) return Promise.reject(resolved);
+      body = resolved;
+    } catch (e) {
+      return Promise.reject(e);
+    }
+    const payload = body;
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -213,8 +240,10 @@ export function requestedPaths(urls) {
 }
 
 // Let queued promise callbacks run. The plugin chains several .then() hops per
-// request, so one macrotask is not enough to settle a chain.
-export async function settle(rounds = 12) {
+// request (search, then show detail, then the season list), so one macrotask
+// is nowhere near enough to settle a chain. 12 was marginal; a slow fixture
+// failed intermittently.
+export async function settle(rounds = 30) {
   for (let i = 0; i < rounds; i++) {
     await new Promise((r) => setImmediate(r));
   }
