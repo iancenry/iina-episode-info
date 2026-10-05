@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { hostsInSource } from "./lib/url-hosts.mjs";
+import { textFiles } from "./lib/plugin-files.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -117,7 +118,7 @@ const need = (cond, msg) => { if (!cond) throw new Error(msg); };
 async function checkAllowlist() {
   const info = JSON.parse(readFileSync(join(ROOT, "Info.json"), "utf8"));
   const allowed = new Set(info.allowedDomains || []);
-  const sources = ["main.js", "sidebar.html", "overlay.html"];
+  const sources = textFiles();
   const hosts = new Set();
 
   for (const file of sources) {

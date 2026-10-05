@@ -517,6 +517,28 @@ test("an absolute number past the end of every season claims nothing", async () 
     "the picker should be left for the user");
 });
 
+test("an absolute number in a season TMDB has not counted yet is not season 1", async () => {
+  // The newest seasons of a long-running show carry no episode_count until
+  // TMDB publishes one, so the running total stops short of the number in the
+  // filename. locateAbsolute gave up, and the caller then opened season 1
+  // because that was the first entry in the list, which is how a One Piece
+  // file from season 36 was reported as season 1.
+  const seasons = [];
+  for (let i = 1; i <= 20; i++) seasons.push({ season_number: i, episode_count: 50 });
+  seasons.push({ season_number: 21 });   // newest, and still uncounted
+  const app = boot({
+    "/3/search/tv": ONE_PIECE_RESULTS,
+    "/3/tv/37854": { ...ONE_PIECE, number_of_seasons: 21, seasons }
+  });
+  await identify(app, "file:///v/" + FANSUB);
+  // 1062 is past the counted total of 1000, so the season is knowable but the
+  // episode within it is not. Nothing may be invented.
+  assert.equal(selected(app), null, "an episode number was invented");
+  const panel = app.document.getElementById("panel").innerHTML;
+  assert.match(panel, /pickSeason\(21\)/, `not left on the newest season: ${panel}`);
+  assert.doesNotMatch(panel, /class="pill on"[^>]*>S01/, "opened season 1 anyway");
+});
+
 test("a four-digit number with no bracket range is located by absolute number", async () => {
   // 1062 is four digits, which used to be refused as a possible year, so an
   // Erai-raws One Piece file identified nothing at all. It is an episode
@@ -550,4 +572,93 @@ test("a release-group bracket costs nothing when the filename title is good", as
   // "SubsPlease" is a weak candidate, so it is never reached: the real title
   // answers on the first query.
   assert.deepEqual(searchedQueries(app.fetchCalls).filter(Boolean), ["One Piece"]);
+});
+
+// ── The remembered entry has to agree with an absolute number too ────────
+
+test("a remembered episode is re-checked against an absolute number", async () => {
+  // The staleness test only compared the filename's SxxEyy code, so a file
+  // numbered by absolute episode had no check at all: whatever was remembered
+  // for that URL was replayed, however wrong. The comment above that test
+  // claims the filename is ground truth for the episode, and for these files
+  // it was not being consulted.
+  const app = boot({ "/3/search/tv": ONE_PIECE_RESULTS });
+  const url = "file:///v/" + FANSUB;
+  app.iina._emit("fileChanged", { url });
+  await settle();
+  assert.equal(selected(app).code, "S21E62", "the fixture should identify first");
+
+  // Strip the recorded absolute number, which is what an entry written before
+  // that field existed looks like: it cannot be checked, so it is rebuilt once.
+  const map = JSON.parse(app.localStorage.getItem("epinfo_url_map"));
+  delete map[url].absoluteFrom;
+  map[url].code = "S01E01";
+  map[url].season = 1;
+  map[url].episode = 1;
+  app.localStorage.setItem("epinfo_url_map", JSON.stringify(map));
+
+  // Play something else first: a repeat of fileChanged for the file already
+  // playing is a deliberate no-op, so it cannot stand in for "the user came
+  // back".
+  app.iina._emit("fileChanged", { url: "file:///v/Severance.S01E01.mkv" });
+  await settle();
+  const before = app.fetchCalls.length;
+  app.iina._emit("fileChanged", { url });
+  await settle();
+  assert.ok(app.fetchCalls.length > before,
+    "the unchecked entry was replayed instead of re-identified");
+  assert.equal(selected(app).code, "S21E62", "the wrong remembered episode survived");
+});
+
+test("a renumbered absolute file is re-identified rather than replayed", async () => {
+  const app = boot({
+    "/3/search/tv": ONE_PIECE_RESULTS,
+    // Absolute 1070 lands on episode 70, so the season has to list it.
+    "/3/tv/37854/season/21": {
+      poster_path: "",
+      episodes: [
+        { episode_number: 62, name: "The Very, Very, Very Strongest Sea Punk", air_date: "2025-12-07" },
+        { episode_number: 70, name: "Egghead", air_date: "2026-02-01" }
+      ]
+    }
+  });
+  const url = "file:///v/" + FANSUB;
+  app.iina._emit("fileChanged", { url });
+  await settle();
+  assert.equal(selected(app).code, "S21E62");
+
+  // Same URL, but the file behind it has been renumbered. The remembered
+  // episode still looks internally consistent, so only the recorded number
+  // gives it away.
+  const renamed = "file:///v/[One Pace][1070-1071] Egghead 12 [1080p][En Sub][FD5592BE].mp4";
+  const map = JSON.parse(app.localStorage.getItem("epinfo_url_map"));
+  map[renamed] = map[url];
+  app.localStorage.setItem("epinfo_url_map", JSON.stringify(map));
+
+  app.iina._emit("fileChanged", { url: "file:///v/Severance.S01E01.mkv" });
+  await settle();
+  const before = app.fetchCalls.length;
+  app.iina._emit("fileChanged", { url: renamed });
+  await settle();
+  assert.ok(app.fetchCalls.length > before,
+    "an entry built from a different absolute number was replayed");
+  assert.equal(selected(app).code, "S21E70", "the old episode number survived a rename");
+});
+
+test("a remembered episode that still agrees with the absolute number is kept", async () => {
+  // The counterpart to the test above: re-identifying a correct entry on every
+  // return would cost a request per replay of every file.
+  const app = boot({ "/3/search/tv": ONE_PIECE_RESULTS });
+  const url = "file:///v/" + FANSUB;
+  app.iina._emit("fileChanged", { url });
+  await settle();
+  app.iina._emit("fileChanged", { url: "file:///v/Severance.S01E01.mkv" });
+  await settle();
+  // Counted after the excursion, which does a lookup of its own, so the
+  // assertion is about this file and nothing else.
+  const before = app.fetchCalls.length;
+  app.iina._emit("fileChanged", { url });
+  await settle();
+  assert.equal(app.fetchCalls.length, before, "a still-correct entry was re-fetched");
+  assert.equal(selected(app).code, "S21E62");
 });

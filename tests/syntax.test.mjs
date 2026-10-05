@@ -27,9 +27,9 @@ function nodeCheck(label, source) {
   }
 }
 
-test("sidebar.html inline scripts parse", () => {
+test("sidebar.html scripts parse", () => {
   const bodies = sidebarScripts();
-  assert.ok(bodies.length >= 1, "expected at least one inline script in sidebar.html");
+  assert.ok(bodies.length >= 1, "expected at least one script in sidebar.html");
   bodies.forEach((src, i) => nodeCheck(`sidebar.html script #${i + 1}`, src));
 });
 

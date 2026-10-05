@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadSidebar, settle, searchedQueries } from "./helpers/harness.mjs";
-import { readRepo } from "./helpers/extract.mjs";
+import { readRepo, sidebarSource } from "./helpers/extract.mjs";
 
 const KEY = { epinfo_tmdb_key: "TESTKEY" };
 
@@ -260,7 +260,7 @@ test("a non-array url map yields no remembered entries", () => {
 test("a film record is built in one place", () => {
   // Two literals had already drifted: one took the id from the detail
   // response, the other from the search result.
-  const sidebar = readRepo("sidebar.html");
+  const sidebar = sidebarSource();
   assert.equal((sidebar.match(/showTitle:\s*"Movie"/g) || []).length, 1,
     "the film record literal appears more than once");
 });
@@ -273,4 +273,34 @@ test("a search with no results says so and re-enables the button", async () => {
   assert.match(h.document.getElementById("panel").innerHTML, /No results/);
   assert.equal(h.document.getElementById("go").disabled, false,
     "the GO button stayed disabled after a search that returned nothing");
+});
+
+test("a recent pick cannot be contradicted by a leftover season grid", () => {
+  // Clicking a Recent Pick painted the card but left the panel alone, so a grid
+  // from an earlier parse stayed on screen underneath it. A One Piece card
+  // reading S36E04 was reported above a grid reading S01, which is a pick the
+  // plugin was not making. The normal pick path clears this state, so the
+  // recent path has to as well.
+  const h = boot();
+  const info = {
+    showTitle: "One Piece", epTitle: "Adventure in the Land of Science",
+    code: "S36E04", context: "Season 36 of 36", airDate: "2025-08-03",
+    rating: "8.5", overview: "", posterUrl: "", logoUrl: "",
+    tmdbId: "37854", season: 36, episode: 4, isMovie: false
+  };
+  h.global.saveSelection(info);
+  // Whatever an earlier identification left behind: a grid on another season.
+  h.global.selShow = { id: 1399, _name: "Severance", _seasons: SHOW.seasons };
+  h.global.selSeason = 1;
+  h.global.renderSeasons();
+  assert.match(h.document.getElementById("panel").innerHTML, /pickSeason/,
+    "the test needs a grid on screen to be meaningful");
+
+  h.global.applyRecent(0);
+  const panel = h.document.getElementById("panel").innerHTML;
+  assert.doesNotMatch(panel, /pickSeason/,
+    `a stale grid survived a different pick: ${panel}`);
+  assert.equal(h.global.selSeason, null, "the old season stayed selected");
+  // The card is the point of the click, so it must still be there.
+  assert.equal(h.document.getElementById("s-title").textContent, info.epTitle);
 });

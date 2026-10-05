@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { hostsInSource } from "../scripts/lib/url-hosts.mjs";
+import { textFiles } from "../scripts/lib/plugin-files.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -62,7 +63,7 @@ test("a port is not a different host", () => {
 test("every allow-listed host is really called by the code", () => {
   const info = JSON.parse(readFileSync(join(ROOT, "Info.json"), "utf8"));
   const hosts = new Set();
-  for (const file of ["main.js", "sidebar.html", "overlay.html"]) {
+  for (const file of textFiles()) {
     const src = readFileSync(join(ROOT, file), "utf8");
     for (const h of hostsInSource(src, /\.html$/.test(file))) hosts.add(h);
   }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadSidebar, loadOverlay, settle } from "./helpers/harness.mjs";
-import { readRepo } from "./helpers/extract.mjs";
+import { readRepo, sidebarSource } from "./helpers/extract.mjs";
 
 const KEY = { epinfo_tmdb_key: "TESTKEY" };
 
@@ -212,7 +212,7 @@ test("the logo and poster carry the title as alt text", () => {
 });
 
 test("a film no longer prints its year twice", () => {
-  const sidebar = readRepo("sidebar.html");
+  const sidebar = sidebarSource();
   // `code` held the year and airDate began with the year, so the meta row read
   // "2011 · 2011-06-03".
   assert.doesNotMatch(sidebar, /code:\s*\(d\.release_date \|\| ""\)\.slice/);

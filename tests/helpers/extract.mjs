@@ -9,19 +9,38 @@ export function readRepo(file) {
   return readFileSync(join(ROOT, file), "utf8");
 }
 
-// The web views keep their logic in inline <script> bodies with no src, so the
-// only way to test them is to pull the bodies out of the HTML. External
-// scripts are skipped: nothing in this repo uses them, and a src'd body would
-// not be self-contained anyway.
-const SCRIPT_RE = /<script(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi;
+// The web views keep their logic in <script> tags with no src. The sidebar's
+// logic is split across sidebar/*.js and pulled in by src, the overlay's is
+// still inline. Both are collected here in document order, which is the order
+// the WebView itself would run them in: classic scripts share one global
+// scope, so a body that calls a function declared in a later file only works
+// because the later file has already been evaluated by the time the call runs.
+// Resolving the src against the HTML file's own directory keeps that ordering
+// honest rather than alphabetical.
+const SCRIPT_RE = /<script([^>]*)>([\s\S]*?)<\/script>/gi;
+const SRC_RE = /\bsrc\s*=\s*["']([^"']+)["']/i;
 
 export function extractScripts(file) {
   const html = readRepo(file);
+  const dir = dirname(join(ROOT, file));
   const out = [];
   let m;
   SCRIPT_RE.lastIndex = 0;
-  while ((m = SCRIPT_RE.exec(html)) !== null) out.push(m[1]);
-  if (!out.length) throw new Error(`no inline <script> bodies found in ${file}`);
+  while ((m = SCRIPT_RE.exec(html)) !== null) {
+    const src = SRC_RE.exec(m[1] || "");
+    if (src) {
+      const ref = src[1];
+      // A remote src would make the suite depend on the network, and would
+      // also mean the shipped plugin did, which the allow-list check covers.
+      if (/^(https?:)?\/\//i.test(ref)) {
+        throw new Error(`${file} loads a remote script: ${ref}`);
+      }
+      out.push(readFileSync(join(dir, ref), "utf8"));
+    } else {
+      out.push(m[2]);
+    }
+  }
+  if (!out.length) throw new Error(`no <script> tags found in ${file}`);
   return out;
 }
 
@@ -31,6 +50,13 @@ export function sidebarScripts() {
 
 export function overlayScripts() {
   return extractScripts("overlay.html");
+}
+
+// Every line of the sidebar's JavaScript, joined. For tests that assert on the
+// source rather than on a rendered element, because the harness's document is a
+// stub and never parses HTML.
+export function sidebarSource() {
+  return sidebarScripts().join("\n;\n");
 }
 
 // main.js is a plain script IINA evaluates, not a web view.

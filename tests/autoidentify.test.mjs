@@ -165,3 +165,84 @@ test("a film is chosen by how well its name matches, not by votes alone", async 
   assert.equal(info.epTitle, "Star Wars: Episode IV - A New Hope",
     "the higher-voted title won despite matching the name less well");
 });
+
+// ── An errored lookup is not an unrecognised filename ────────────────────
+
+test("a rate-limited TMDB is reported as a failed lookup, not as no match", async () => {
+  // A rate-limited TMDB resolves with a body carrying status_code and no
+  // results array. Reading that as "no matches" blamed the filename for a
+  // transient failure, and then spent every remaining candidate asking the
+  // same refused question, which made the limit worse for the next file too.
+  const h = boot({
+    routes: {
+      "/3/search/movie": { status_code: 25, status_message: "Rate limit exceeded" },
+      "/3/search/tv": { status_code: 25, status_message: "Rate limit exceeded" }
+    }
+  });
+  await identify(h, "file:///Users/me/Videos/Decision.To.Leave.2022.1080p.Korean.WEB-DL.HEVC.x265-GROUP.mkv");
+  const panel = h.document.getElementById("panel").innerHTML;
+  assert.doesNotMatch(panel, /No match for/,
+    "a TMDB error was reported as an unrecognised filename");
+  assert.match(panel, /Lookup failed/, `panel did not say the lookup failed: ${panel}`);
+  assert.equal(searchedQueries(h.fetchCalls).filter(Boolean).length, 1,
+    "the ladder kept spending requests after TMDB had already refused");
+});
+
+test("an errored lookup names no title and selects nothing", async () => {
+  const h = boot({
+    routes: {
+      "/3/search/tv": { status_code: 25, status_message: "Rate limit exceeded" },
+      "/3/search/movie": { status_code: 25, status_message: "Rate limit exceeded" }
+    }
+  });
+  await identify(h, "file:///Users/me/Videos/Severance.S02E03.mkv");
+  assert.equal(episodeSelected(h), null, "something was selected from an error body");
+});
+
+test("a film the ladder will not auto-accept is offered as a pickable row", async () => {
+  // TMDB files a same-titled 2021 film above the real 2022 one, so the year
+  // gate refuses the top hit and the ladder runs out of candidates. The
+  // results it already had are exactly what the user needs, and they were being
+  // thrown away in favour of "search above".
+  const h = boot({
+    routes: {
+      "/3/search/movie": {
+        results: [
+          { id: 1, title: "Decision to Leave", release_date: "2021-03-05", vote_count: 900 },
+          { id: 2, title: "Leaving", release_date: "2022-06-24", vote_count: 4000 }
+        ]
+      },
+      "/3/movie/1": { id: 1, title: "Decision to Leave", release_date: "2021-03-05",
+                      vote_average: 6.1, overview: "", poster_path: "/a.jpg", images: {} },
+      "/3/movie/2": { id: 2, title: "Decision to Leave", release_date: "2022-06-24",
+                      vote_average: 8.0, overview: "", poster_path: "/b.jpg", images: {} }
+    }
+  });
+  await identify(h, "file:///Users/me/Videos/Decision.To.Leave.2022.1080p.Korean.WEB-DL.HEVC.x265-GROUP.mkv");
+
+  const panel = h.document.getElementById("panel").innerHTML;
+  assert.match(panel, /pickItemByIndex/, `the results were discarded: ${panel}`);
+  assert.equal(episodeSelected(h), null, "the year gate said no, so nothing was auto-chosen");
+
+  // And the right one is a single click away.
+  h.global.pickItemByIndex(1);
+  await settle();
+  const info = episodeSelected(h);
+  assert.ok(info, "picking a suggestion selected nothing");
+  assert.match(info.airDate, /^2022/, `picked the wrong film: ${info.airDate}`);
+});
+
+test("a failed lookup offers no rows, because it has none to offer", async () => {
+  // The suggestions must not paper over a rate limit: there were no results,
+  // so a list of rows would be a different lie.
+  const h = boot({
+    routes: {
+      "/3/search/tv": { status_code: 25, status_message: "Rate limit exceeded" },
+      "/3/search/movie": { status_code: 25, status_message: "Rate limit exceeded" }
+    }
+  });
+  await identify(h, "file:///Users/me/Videos/Decision.To.Leave.2022.1080p.mkv");
+  const panel = h.document.getElementById("panel").innerHTML;
+  assert.doesNotMatch(panel, /pickItemByIndex/, "rows offered with no results behind them");
+  assert.match(panel, /Lookup failed/);
+});
