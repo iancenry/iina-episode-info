@@ -23,7 +23,7 @@ nothing about the plugin; a card with the video behind it says everything.
 
 Done: card-episode.png, sidebar.png, skip-pill.png. Still to shoot:
 card-film.png (a film, where the wordmark replaces the title outright) and
-themes.png (the three themes side by side). See docs/SHOTS.md.
+themes.png (the three themes side by side).
 -->
 
 ## What it does
