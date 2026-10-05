@@ -52,17 +52,8 @@ jobs:
         run: npm test
 
       - name: Verify the plugin manifest still matches the shipped version
-        run: node -e '
-          const a = require("./Info.json").version;
-          const b = require("./package.json").version;
-          // The header comment in main.js claims CI keeps this in step, so it is
-          // compared rather than left as a claim nobody checks.
-          const fs = require("fs");
-          const m = /\@version\s+([0-9]+\.[0-9]+\.[0-9]+)/.exec(fs.readFileSync("main.js", "utf8"));
-          const c = m && m[1];
-          const bad = [];
-          if (a !== b) bad.push(`Info.json ${a} vs package.json ${b}`);
-          if (a !== c) bad.push(`Info.json ${a} vs main.js ${c || "none"}`);
-          if (bad.length) { console.error("version mismatch: " + bad.join("; ")); process.exit(1); }
-          console.log("version " + a + " everywhere");
-        '
+        # A script file, not inline `node -e`. A JavaScript string containing
+        # ": " ends a YAML plain scalar, so the workflow did not parse at all:
+        # GitHub reported a syntax error and ran no steps, which looks exactly
+        # like a broken suite. Nothing this fragile belongs in a YAML value.
+        run: node scripts/check-version.mjs

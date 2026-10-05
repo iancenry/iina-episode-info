@@ -71,3 +71,18 @@ test("every allow-listed host is really called by the code", () => {
   const notAllowed = [...hosts].filter((h) => !info.allowedDomains.includes(h));
   assert.deepEqual(notAllowed, [], `called but not allowed: ${notAllowed.join(", ")}`);
 });
+test("the shipped version agrees across Info.json, package.json and main.js", () => {
+  // A release that ships 1.4.0 in the manifest and 1.3.1 in the header produces
+  // a bug report naming a version nobody is running. This lives in a script
+  // rather than inline in the workflow because a JS string containing ": "
+  // terminates a YAML plain scalar, and GitHub rejected the entire workflow
+  // file over one — which reported as a failed run with no steps and looked
+  // exactly like a broken suite.
+  const version = JSON.parse(readFileSync(join(ROOT, "Info.json"), "utf8")).version;
+  assert.equal(JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version, version,
+    "package.json and Info.json disagree");
+  const header = /@version\s+([0-9]+\.[0-9]+\.[0-9]+)/
+    .exec(readFileSync(join(ROOT, "main.js"), "utf8"));
+  assert.ok(header, "main.js has no machine-readable @version line for CI to read");
+  assert.equal(header[1], version, "main.js and Info.json disagree");
+});
