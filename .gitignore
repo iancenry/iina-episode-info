@@ -14,3 +14,8 @@ node_modules/
 # content. Both still work from disk; they're just not published.
 NOTES.md
 AGENTS.md
+
+# Feature proposals being researched. Same reasoning: each says of itself
+# that nothing in it is implemented, and the reasoning matters more to the
+# author than to a reader of the repository.
+todo/

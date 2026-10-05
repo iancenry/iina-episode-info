@@ -1,8 +1,8 @@
 {
   "name": "Episode Info",
-  "identifier": "com.iancenry.episodeinfo",
+  "identifier": "com.iancenry.sidekick",
   "version": "1.4.0",
-  "ghRepo": "iancenry/iina-episode-info",
+  "ghRepo": "iancenry/iina-sidekick",
   "ghVersion": 1,
   "author": {
     "name": "iancenry",

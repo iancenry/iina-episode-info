@@ -320,18 +320,25 @@ if (parsed.isMovie) {
 // season in the show response we already have, so the mapping is arithmetic
 // rather than another request.
 //
-// A season with no episode_count is skipped, which is what used to break this.
-// The newest seasons of a long-running show have no count until TMDB publishes
-// one, so the running total stopped short of the number in the filename and
-// this returned null. The caller then opened season 1 because that was the
-// first entry in the list, and a One Piece file from season 36 was reported as
-// season 1. When the total runs out, the first uncounted season is the only
-// place the episode can be, so it is returned with a null episode: the season
-// is knowable, the episode inside it is not.
+// Two things stop the arithmetic short of the number in the filename, and both
+// used to return null, which sent the caller to season 1 because that was the
+// first entry in the list:
+//
+//   - A season with no episode_count, which is how a show still being split
+//     looks. Skipping it contributes nothing to the total.
+//   - A total that is simply behind the source numbering. One Piece's newest
+//     season carries fewer episodes than have aired, so every season has a
+//     count and the sum still stops below 1067.
+//
+// When the total runs out, the episodes that are missing are in the newest
+// season, because that is where new ones go. Season 1 is the least plausible
+// home for a high absolute number of any show, and picking it is what made a
+// season 36 file report as season 1.
 //
 // This assumes the source numbering lines up with TMDB's season splits, which
-// holds for most long-running series but is not guaranteed. When the total
-// falls outside every season and every season is counted, nothing is claimed.
+// holds for most long-running series but is not guaranteed. The episode within
+// the season is not derivable past the end of the total, so nothing is claimed
+// and the pills are left for the user.
 function locateAbsolute(show, absolute) {
   if (!absolute) return null;
   var seasons = (show.seasons || []).filter(function(s) { return s.season_number > 0; });
@@ -339,8 +346,6 @@ function locateAbsolute(show, absolute) {
   for (var i = 0; i < seasons.length; i++) {
     var count = seasons[i].episode_count || 0;
     if (!count) {
-      // Newer than everything counted so far, so the first one is the only
-      // candidate for a number past the total.
       if (uncounted === null) uncounted = seasons[i].season_number;
       continue;
     }
@@ -349,7 +354,9 @@ function locateAbsolute(show, absolute) {
     }
     seen += count;
   }
-  return uncounted === null ? null : { season: uncounted, episode: null };
+  if (!seasons.length) return null;
+  var fallback = uncounted !== null ? uncounted : seasons[seasons.length - 1].season_number;
+  return { season: fallback, episode: null };
 }
 
 // Wire the picker to a full show detail object, whichever route produced it:

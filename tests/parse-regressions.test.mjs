@@ -539,6 +539,37 @@ test("an absolute number in a season TMDB has not counted yet is not season 1", 
   assert.doesNotMatch(panel, /class="pill on"[^>]*>S01/, "opened season 1 anyway");
 });
 
+test("an absolute number past every counted season lands on the newest, not season 1", async () => {
+  // TMDB's season splits lag a long-running show: the newest season carries
+  // fewer episodes than have actually aired, so the running total stops below
+  // the fansub's own numbering. Every season here has a count, so the
+  // uncounted-season path does not apply and this returned null. The caller
+  // then opened season 1 because that was the first entry in the list, which is
+  // how a One Piece file from season 36 was reported as season 1.
+  const seasons = [];
+  for (let i = 1; i <= 35; i++) seasons.push({ season_number: i, episode_count: 30 });
+  seasons.push({ season_number: 36, episode_count: 3 });
+  const app = boot({
+    "/3/search/tv": ONE_PIECE_RESULTS,
+    "/3/tv/37854": { ...ONE_PIECE, number_of_seasons: 36, seasons },
+    "/3/tv/37854/season/36": {
+      poster_path: "",
+      episodes: [
+        { episode_number: 1, name: "a", air_date: "2025-07-06" },
+        { episode_number: 2, name: "b", air_date: "2025-07-13" },
+        { episode_number: 3, name: "c", air_date: "2025-07-20" }
+      ]
+    }
+  });
+  await identify(app, "file:///v/[One Pace][1067-1068] Egghead 07 [1080p][En Sub][07BDAEEE].mp4");
+  // 1067 is past the counted total of 1053, so the season is knowable and the
+  // episode inside it is not. Nothing may be invented.
+  assert.equal(selected(app), null, "an episode number was invented");
+  const panel = app.document.getElementById("panel").innerHTML;
+  assert.match(panel, /pickSeason\(36\)/, `not left on the newest season: ${panel}`);
+  assert.doesNotMatch(panel, /class="pill on"[^>]*>S01/, "opened season 1 anyway");
+});
+
 test("a four-digit number with no bracket range is located by absolute number", async () => {
   // 1062 is four digits, which used to be refused as a possible year, so an
   // Erai-raws One Piece file identified nothing at all. It is an episode
