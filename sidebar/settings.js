@@ -95,7 +95,8 @@ function doChangeKey() {
 // ── NEW: Opacity slider ───────────────────────────────────────
 (function(){
   var s = localStorage.getItem("epinfo_overlay_opacity");
-  if (s !== null) {
+  // A corrupt value must not render "NaN%".
+  if (s !== null && !isNaN(parseFloat(s))) {
     var p = Math.round(parseFloat(s) * 100);
     document.getElementById("opacity-slider").value = p;
     document.getElementById("opacity-val").textContent = p + "%";
@@ -124,14 +125,14 @@ function vposLabel(v) {
 }
 (function(){
   var s = localStorage.getItem("epinfo_overlay_vpos");
-  if (s !== null) {
+  if (s !== null && !isNaN(parseFloat(s))) {
     var v = parseFloat(s);
     document.getElementById("vpos-slider").value = v;
     document.getElementById("vpos-val").textContent = vposLabel(v);
   }
   setTimeout(function() {
     var v = localStorage.getItem("epinfo_overlay_vpos");
-    if (v !== null) iina.postMessage("setOverlayVerticalPos", { value: parseFloat(v) });
+    if (v !== null && !isNaN(parseFloat(v))) iina.postMessage("setOverlayVerticalPos", { value: parseFloat(v) });
   }, 800);
 })();
 function doSetVPos(val) {
@@ -542,5 +543,8 @@ function doDddTab(t) {
 
 (function initDddTab() {
   var t = localStorage.getItem("epinfo_ddd_tab") || "cues";
+  // Validated like doDddTab does: an unknown stored value used to hide every
+  // pane at once.
+  if (DDD_TABS.indexOf(t) < 0) t = "cues";
   paintDddTab(t);
 })();

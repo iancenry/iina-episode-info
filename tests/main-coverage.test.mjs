@@ -774,17 +774,17 @@ test("IntroDB's own kinds are read by its parser, not just by pushSegment", asyn
 });
 
 test("a lookup that throws still answers", () => {
-  // Every call site is fire-and-forget, so a throw would be an unhandled
-  // rejection and the button would stay on "Searching…" for the session.
-  const m = skipSession({
-    ["https://api.introdb.app/segments?imdb_id=" + IMDB + "&season=1&episode=1"]: () => {
-      throw new Error("hostile");
-    }
-  });
+  // Every call site is fire-and-forget, and the sidebar re-enables its button
+  // only on skipResult; an unexpected throw must still report. The provider
+  // routes swallow their own failures two layers down, so the injected throw
+  // lands on the first call outside them: the merge.
+  const m = skipSession({ [introKey(1)]: hit(0, 90) });
+  m.global.mergeSegments = function() { throw new Error("hostile"); };
   m.fromWebView("sidebar", "episodeSelected", EPISODE);
   return settle().then(() => {
-    assert.ok(m.posted("sidebar", "skipResult").length > 0,
-      "a failed lookup never reported, so the button stayed disabled");
+    const last = m.posted("sidebar", "skipResult").pop();
+    assert.ok(last, "a failed lookup never reported, so the button stayed disabled");
+    assert.equal(last.stale, true, "the failure report did not say stale");
   });
 });
 

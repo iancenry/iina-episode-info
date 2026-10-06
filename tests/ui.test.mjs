@@ -250,11 +250,19 @@ test("a corrupt folder map yields no pins, and lookup tolerates it", () => {
   assert.equal(h.global.pinForUrl("file:///Users/me/Videos/x.mkv"), null);
 });
 
-test("a non-array url map yields no remembered entries", () => {
-  const h = boot({ epinfo_url_map: '["an","array"]' });
-  assert.doesNotThrow(() => h.global.pruneUrlMap());
-  h.iina._emit("fileChanged", { url: "file:///v/Severance S01E01.mkv" });
-  assert.doesNotThrow(() => {}, "fileChanged threw on a corrupt url map");
+test("a corrupt url map yields no remembered entries", () => {
+  // A stored null passed the old guard and then threw in Object.keys during
+  // the boot prune, which skipped sidebarReady and took per-URL restore with
+  // it. The empty-function assertion this replaced could never fail.
+  for (const raw of ['["an","array"]', "null", "nonsense"]) {
+    const h = boot({ epinfo_url_map: raw });
+    assert.equal(Object.keys(h.global.loadUrlMap()).length, 0, `kept ${raw}`);
+    assert.doesNotThrow(() => h.global.pruneUrlMap());
+    assert.doesNotThrow(
+      () => h.iina._emit("fileChanged", { url: "file:///v/Severance S01E01.mkv" }),
+      `fileChanged threw on ${raw}`
+    );
+  }
 });
 
 test("a film record is built in one place", () => {

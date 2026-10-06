@@ -9,7 +9,7 @@
     "url": "https://github.com/iancenry"
   },
   "entry": "main.js",
-  "description": "Auto-detected episode/movie info overlay on pause. TMDB only.",
+  "description": "Auto-detected episode/movie info overlay on pause, with optional skip intro and scene content warnings.",
   "permissions": [
     "video-overlay",
     "network-request",

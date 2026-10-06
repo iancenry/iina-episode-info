@@ -42,8 +42,13 @@ function pruneUrlMap() {
 // `currentVideoUrl` is set by the fileChanged handler.
 var currentVideoUrl = "";
 function loadUrlMap() {
-  try { return JSON.parse(localStorage.getItem("epinfo_url_map") || "{}"); }
-  catch(e) { return {}; }
+  // The shape is checked, not just the parse: a stored `null` passed the old
+  // guard and then threw in Object.keys during the boot prune, skipping
+  // sidebarReady and taking per-URL restore down with it.
+  try {
+    var m = JSON.parse(localStorage.getItem("epinfo_url_map") || "{}");
+    return (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+  } catch(e) { return {}; }
 }
 function saveUrlMap(m) {
   try { localStorage.setItem("epinfo_url_map", JSON.stringify(m)); } catch(e) {}
@@ -141,6 +146,7 @@ function doClear() {
   showTotals   = null;
   iina.postMessage("setSceneMarks", { marks: [] });
   iina.postMessage("clearEpisode", {});
+  if (typeof resetMarkUiState === "function") resetMarkUiState();
   if (typeof paintMarks === "function") paintMarks();
   resetPanel();
 }
@@ -149,8 +155,16 @@ function doClear() {
 // The user's own trigger/skip-to pairs, for titles the databases have not
 // timed (X2's Mystique scenes, for instance). Keyed like a DDD rating —
 // tmdbId:season:episode, with a film's indexes at -1 — so they attach to the
-// same identification the rest of the plugin uses. Kept indefinitely: a mark
-// is manual work, not a cache.
+// same identification the rest of the plugin uses.
+//
+// Bounded like the URL and folder maps: each title's entry carries a lastSeen
+// stamp refreshed whenever its marks are used, anything untouched for six
+// months is dropped at launch, and a hard cap on stored titles keeps an
+// active library from growing forever. The cap prefers to evict entries that
+// hold only scanner-added Silent marks; a curated mark is user work.
+var MARKS_MAX_AGE_MS = 180 * 86400000;
+var MARKS_TITLE_CAP = 400;
+
 function markKey(info) {
   if (!info || !info.tmdbId) return "";
   var s = info.isMovie ? -1 : Number(info.season);
@@ -169,18 +183,71 @@ function saveMarks(m) {
   try { localStorage.setItem("epinfo_marks", JSON.stringify(m)); } catch (e) {}
 }
 
+// Entries written before the stamp existed are bare arrays. They are kept
+// (treated as untouchable by the age prune, like the other maps' legacy
+// entries) and rewritten in the timestamped shape the first time they change.
+function markEntry(v) {
+  if (Array.isArray(v)) return { marks: v, lastSeen: 0 };
+  if (v && typeof v === "object" && Array.isArray(v.marks)) return v;
+  return null;
+}
+
+function markEntryCurated(e) {
+  return e.marks.some(function(m) { return m && m.action && m.action !== "silent"; });
+}
+
 function marksFor(info) {
-  var list = loadMarks()[markKey(info)];
-  return Array.isArray(list) ? list : [];
+  var k = markKey(info);
+  if (!k) return [];
+  var all = loadMarks();
+  var e = markEntry(all[k]);
+  if (!e) return [];
+  var now = Date.now();
+  // Reading a title's marks counts as using them; written at most once every
+  // six hours so a busy sidebar does not rewrite storage on every paint.
+  if (now - (e.lastSeen || 0) > 6 * 3600000) {
+    e.lastSeen = now;
+    all[k] = e;
+    saveMarks(all);
+  }
+  return e.marks;
 }
 
 function setMarksFor(info, list) {
   var k = markKey(info);
   if (!k) return;
-  var m = loadMarks();
-  if (list && list.length) m[k] = list;
-  else delete m[k];
-  saveMarks(m);
+  var all = loadMarks();
+  if (list && list.length) all[k] = { marks: list, lastSeen: Date.now() };
+  else delete all[k];
+  saveMarks(all);
+}
+
+// Age first, then the cap. Returns the number of titles dropped.
+function pruneMarks() {
+  var all = loadMarks();
+  var now = Date.now();
+  var dropped = 0;
+  var keys = Object.keys(all).filter(function(k) {
+    var e = markEntry(all[k]);
+    if (!e) { delete all[k]; dropped++; return false; }
+    // A legacy entry has no stamp and is never aged out.
+    if (e.lastSeen && now - e.lastSeen > MARKS_MAX_AGE_MS) { delete all[k]; dropped++; return false; }
+    return true;
+  });
+  if (keys.length > MARKS_TITLE_CAP) {
+    keys.sort(function(a, b) {
+      var ea = markEntry(all[a]), eb = markEntry(all[b]);
+      var ca = markEntryCurated(ea) ? 1 : 0, cb = markEntryCurated(eb) ? 1 : 0;
+      if (ca !== cb) return ca - cb;                 // scan-only entries first
+      return (ea.lastSeen || 0) - (eb.lastSeen || 0); // then the oldest
+    });
+    keys.slice(0, keys.length - MARKS_TITLE_CAP).forEach(function(k) {
+      delete all[k];
+      dropped++;
+    });
+  }
+  if (dropped) saveMarks(all);
+  return dropped;
 }
 
 // The identification the marks UI attaches to: whatever the saved-card

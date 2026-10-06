@@ -65,6 +65,41 @@ function markActionOf(m) {
     ? m.action : "skip";
 }
 
+// A stable identity per mark, so the editor keeps pointing at the right row
+// when a scan inserts one before it and the list re-sorts. Older marks get an
+// id the first time they are opened for editing.
+function newMarkId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// Typed-but-unsaved field values survive a repaint by being pulled back into
+// the editor state before the inputs are rebuilt.
+function markEditPullFromDom() {
+  if (!markEdit) return;
+  var l = document.getElementById("mark-edit-label");
+  var s = document.getElementById("mark-edit-start");
+  var e = document.getElementById("mark-edit-end");
+  if (l) markEdit.label = String(l.value || "").trim().slice(0, 60);
+  if (s) { var sv = parseMarkTime(s.value); if (sv != null) markEdit.start = sv; }
+  if (e) {
+    var raw = String(e.value == null ? "" : e.value).trim();
+    if (!raw) markEdit.safe = null;
+    else { var ev = parseMarkTime(raw); if (ev != null) markEdit.safe = ev; }
+  }
+}
+
+// A new file or a cleared selection wipes half-finished mark work: a pending
+// trigger, an open editor and an armed "Sure?" belong to the title that was
+// playing, not the next one.
+function resetMarkUiState() {
+  markPending = null;
+  markEdit = null;
+  markClearArmed = false;
+  if (markClearTimer) { clearTimeout(markClearTimer); markClearTimer = null; }
+  var btn = document.getElementById("ddd-marks-clear");
+  if (btn) btn.textContent = "Clear all";
+}
+
 function markEditorHtml() {
   return '<div class="mark-edit">' +
     '<div class="mark-edit-row"><span class="mark-edit-lbl">Title</span>' +
@@ -148,10 +183,12 @@ function doPreviewLanding(i) {
 }
 
 function doPreviewEditStart() {
+  if (markEdit) markEditPullFromDom();
   if (markEdit) previewAt(markEdit.start - 5);
 }
 
 function doPreviewEditLanding() {
+  if (markEdit) markEditPullFromDom();
   if (markEdit && markEdit.safe != null) previewAt(markEdit.safe - 5);
 }
 
@@ -204,6 +241,7 @@ iina.onMessage("subScanResult", function(d) {
     }
     var safe = Number(p.safe);
     list.push({
+      id: newMarkId(),
       label: String(p.label || "tag"),
       start: start,
       safe: (isFinite(safe) && safe > start) ? safe : null,
@@ -213,6 +251,10 @@ iina.onMessage("subScanResult", function(d) {
     });
     added++;
   });
+  // A repaint is about to rebuild the editor's inputs: keep anything typed
+  // but not yet saved. Ids keep the editor pointing at its own row even
+  // though the new marks re-sort the list.
+  markEditPullFromDom();
   list.sort(function(a, b) { return a.start - b.start; });
   setMarksFor(info, list);
   paintMarks();
@@ -229,8 +271,11 @@ iina.onMessage("subScanResult", function(d) {
 
 iina.onMessage("timeCaptured", function(d) {
   if (!d) return;
-  // The inline editor's "Use playhead" fields.
-  if ((d.kind === "start" || d.kind === "end") && markEdit) {
+  // The inline editor's "Use playhead" fields. If the editor was closed while
+  // the answer was in flight, the value is dropped rather than mistaken for
+  // a fresh trigger capture.
+  if (d.kind === "start" || d.kind === "end") {
+    if (!markEdit) return;
     if (d.seconds == null) { showDddMsg("No playhead yet — load a video first."); return; }
     if (d.kind === "start") markEdit.start = Number(d.seconds);
     else markEdit.safe = Number(d.seconds);
@@ -246,7 +291,7 @@ iina.onMessage("timeCaptured", function(d) {
     var info = currentMarkInfo();
     if (!info) return;
     var list = marksFor(info);
-    list.push({ label: "your mark", start: markPending, safe: Number(d.seconds), action: "skip" });
+    list.push({ id: newMarkId(), label: "your mark", start: markPending, safe: Number(d.seconds), action: "skip" });
     list.sort(function(a, b) { return a.start - b.start; });
     setMarksFor(info, list);
     markPending = null;
@@ -271,7 +316,8 @@ function doMarkWarnOnly() {
   var info = currentMarkInfo();
   if (!info) return;
   var list = marksFor(info);
-  list.push({ label: "your mark", start: markPending, safe: null, action: "skip" });
+  // Warn, not skip: no end means no target, and the type tag should say so.
+  list.push({ id: newMarkId(), label: "your mark", start: markPending, safe: null, action: "warn" });
   list.sort(function(a, b) { return a.start - b.start; });
   setMarksFor(info, list);
   markPending = null;
@@ -290,8 +336,15 @@ function doMarkEdit(i) {
   if (!info) return;
   var list = marksFor(info);
   if (i < 0 || i >= list.length) return;
+  if (!list[i].id) {
+    // Persisted now: a later repaint re-reads the list from storage, so an
+    // id that only lived in memory would be lost with it.
+    list[i].id = newMarkId();
+    setMarksFor(info, list);
+  }
   markEdit = {
     index: i,
+    id: list[i].id,
     label: String(list[i].label || "your mark"),
     start: Number(list[i].start) || 0,
     safe: (list[i].safe != null) ? Number(list[i].safe) : null,
@@ -303,6 +356,9 @@ function doMarkEdit(i) {
 function doEditType(t) {
   if (!markEdit) return;
   if (t !== "silent" && t !== "warn" && t !== "skip" && t !== "auto") return;
+  // The repaint rebuilds the inputs from state, so whatever was typed but
+  // not yet saved has to be read back first.
+  markEditPullFromDom();
   markEdit.action = t;
   paintMarks();
 }
@@ -332,7 +388,16 @@ function doEditSave() {
   if (rawEnd && safe == null) { showDddMsg("End not understood — use mm:ss or h:mm:ss."); return; }
   if (safe != null && !(safe > start)) { showDddMsg("The end must come after the start."); return; }
   var list = marksFor(info);
-  var m = list[markEdit.index];
+  // Found by id, not position: a scan or a deletion may have re-sorted the
+  // list while the editor was open, and writing to the old index would have
+  // overwritten whichever mark now sits there.
+  var idx = markEdit.index;
+  if (markEdit.id) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === markEdit.id) { idx = i; break; }
+    }
+  }
+  var m = list[idx];
   if (!m) { markEdit = null; paintMarks(); return; }
   m.label = label || "your mark";
   m.start = start;

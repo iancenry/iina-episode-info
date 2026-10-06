@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadMain, settle } from "./helpers/main-harness.mjs";
-import { loadSidebar } from "./helpers/harness.mjs";
+import { loadSidebar, loadOverlay } from "./helpers/harness.mjs";
 import { readRepo } from "./helpers/extract.mjs";
 
 // The scene-content-warning machinery: the pure conversions and filters, then
@@ -201,6 +201,23 @@ test("the stronger category action wins a merged moment", () => {
   assert.equal(merged[0].strong, true);
 });
 
+test("a merged moment takes the strongest agreement and the user's origin only if fully theirs", () => {
+  const { g } = boot();
+  const mixed = g.mergeSceneCues([
+    { topicId: null, label: "your mark", start: 100, safe: 130, cue: "", desc: "", action: "auto", strong: true, local: true },
+    { topicId: 153, label: "a dog dies", start: 103, safe: 140, cue: "", desc: "", action: "auto", strong: false, local: false }
+  ]);
+  assert.equal(mixed.length, 1);
+  assert.equal(mixed[0].strong, true, "equal-rank agreement was dropped");
+  assert.ok(!mixed[0].local, "a mixed moment was claimed as the user's own");
+
+  const mine = g.mergeSceneCues([
+    { topicId: null, label: "a", start: 100, safe: 130, cue: "", desc: "", action: "skip", strong: true, local: true },
+    { topicId: null, label: "b", start: 103, safe: 140, cue: "", desc: "", action: "skip", strong: true, local: true }
+  ]);
+  assert.equal(mine[0].local, true, "two local marks were not kept as the user's own");
+});
+
 test("distant moments stay separate and merging nothing yields nothing", () => {
   const { g } = boot();
   const merged = g.mergeSceneCues([
@@ -262,6 +279,12 @@ test("SRT, WebVTT and ASS all parse to cues", () => {
   const b = g.parseSubtitleText(vtt);
   assert.equal(b.length, 1, `vtt did not parse: ${JSON.stringify(b)}`);
   assert.ok(Math.abs(b[0].start - 62.5) < 0.001);
+
+  // WebVTT permits the hours to be omitted, which real files do.
+  const vttNoHours = "WEBVTT\n\n00:10.000 --> 00:12.000\n[Moaning]\n";
+  const b2 = g.parseSubtitleText(vttNoHours);
+  assert.equal(b2.length, 1, `hour-less vtt did not parse: ${JSON.stringify(b2)}`);
+  assert.ok(Math.abs(b2[0].start - 10) < 0.001, `hour-less start was ${b2[0].start}`);
 
   const ass = "[Events]\nDialogue: 0,0:00:41.12,0:00:43.50,Default,,0,0,0,,{\\an8}[screaming]\\Nhelp me\n";
   const c = g.parseSubtitleText(ass);
@@ -923,6 +946,67 @@ test("turning auto cards off leaves other cues alone", async () => {
   assert.equal(cue.mode, "skip");
 });
 
+test("an auto mark at 0:00 fires from the opening moments", async () => {
+  const mpvProps = { duration: 4000, "time-pos": 0 };
+  const m = dddSession(tvRoutes(), { mpvProps });
+  m.fromWebView("sidebar", "setSceneMarks", { marks: [{ label: "zero", start: 0, safe: 30, action: "auto" }] });
+  m.fromWebView("sidebar", "episodeSelected", EPISODE);
+  await settle();
+  mpvProps["time-pos"] = 0.5;
+  m.emit("mpv.time-pos.changed");
+  assert.deepEqual(m.sink.seeks, [30], "a 0:00 auto mark never fired");
+
+  // A resume into the middle of the file is not an opening start.
+  const mpvProps2 = { duration: 4000, "time-pos": 300 };
+  const m2 = dddSession(tvRoutes(), { mpvProps: mpvProps2 });
+  m2.fromWebView("sidebar", "setSceneMarks", { marks: [{ label: "zero", start: 0, safe: 30, action: "auto" }] });
+  m2.fromWebView("sidebar", "episodeSelected", EPISODE);
+  await settle();
+  m2.emit("mpv.time-pos.changed");
+  assert.deepEqual(m2.sink.seeks, [], "a resumed position triggered the 0:00 auto mark");
+});
+
+test("re-identifying the same episode after a clear scans again", async () => {
+  const SRT = "1\n00:00:10,000 --> 00:00:12,000\n[Moaning]\n";
+  const m = loadMain({
+    status: { paused: false, duration: 4000, url: "file:///v/a.mkv" },
+    subtitle: { tracks: [{ id: 9, isExternal: true, codec: "subrip", isSelected: true, title: "a.en.SDH.srt" }] },
+    file: { read: () => SRT }
+  });
+  m.emit("iina.window-loaded");
+  m.runTimers();
+  m.fromWebView("sidebar", "setDddKey", { key: "K" });
+  m.fromWebView("sidebar", "setDddEnabled", { enabled: true });
+  m.fromWebView("sidebar", "episodeSelected", EPISODE);
+  assert.equal(m.posted("sidebar", "subScanResult").filter((r) => r.auto).length, 1);
+  m.fromWebView("sidebar", "clearEpisode", {});
+  m.fromWebView("sidebar", "episodeSelected", EPISODE);
+  assert.equal(m.posted("sidebar", "subScanResult").filter((r) => r.auto).length, 2,
+    "the episode was not scanned again after a clear");
+});
+
+test("a scene lookup that throws still answers", async () => {
+  // The sidebar's button re-enables only on scenesResult; an unexpected throw
+  // must report stale or it spins for the rest of the session.
+  const m = dddSession(tvRoutes());
+  m.global.mergeSceneCues = function() { throw new Error("hostile"); };
+  m.fromWebView("sidebar", "episodeSelected", EPISODE);
+  await settle();
+  const last = m.posted("sidebar", "scenesResult").pop();
+  assert.ok(last, "a failed scene lookup never reported");
+  assert.equal(last.stale, true, "the failure report did not say stale");
+});
+
+test("a local mark's cue card hides the DoesTheDogDie attribution", () => {
+  const o = loadOverlay({});
+  o.iina._emit("showCue", { mode: "skip", label: "mine", at: "1:00", to: "2:00", local: true });
+  assert.equal(o.document.getElementById("cue-attr").style.display, "none",
+    "the database was credited on the user's own mark");
+  o.iina._emit("showCue", { mode: "skip", label: "a dog dies", at: "1:00", to: "2:00", local: false });
+  assert.notEqual(o.document.getElementById("cue-attr").style.display, "none",
+    "the attribution was hidden on database data");
+});
+
 test("a mark with a safe position before or at its start is warn-only", () => {
   const m = dddSession(tvRoutes());
   m.fromWebView("sidebar", "setSceneMarks", { marks: [
@@ -957,6 +1041,10 @@ test("a local mark merges into a database cue at the same moment", async () => {
   assert.match(merged.label, /a dog dies/);
   assert.match(merged.label, /your mark/);
   assert.equal(merged.safe, 3300, "the mark's later safe position did not win");
+  assert.ok(!merged.local, "a mixed moment was claimed as the user's own");
+  const report = m.posted("sidebar", "scenesResult").pop();
+  assert.ok(report.scenes.some((s) => /your mark/.test(s.label)),
+    "the merged cue was dropped from the sidebar list");
 });
 
 test("clearing the selection clears the marks from main.js too", async () => {
@@ -1072,11 +1160,16 @@ test("a selected external subtitle is auto-scanned once per track", () => {
 
 test("a successful scan caches the subtitle for the next open", () => {
   const SRT = "1\n00:00:10,000 --> 00:00:12,000\n[Moaning]\n";
-  const writes = [];
+  const writes = [], deletes = [];
   const m = loadMain({
     status: { paused: false, duration: 4000, url: "file:///v/a.mkv" },
     subtitle: { tracks: [{ id: 9, isExternal: true, codec: "subrip", isSelected: true, title: "a.en.SDH.srt" }] },
-    file: { read: () => SRT, write: (p, t) => writes.push([p, t]) }
+    file: {
+      read: () => SRT,
+      list: () => [{ filename: "sidekick-sub-1399-1-2--111.srt", path: "@data/sidekick-sub-1399-1-2--111.srt" }],
+      delete: (p) => deletes.push(p),
+      write: (p, t) => writes.push([p, t])
+    }
   });
   m.emit("iina.window-loaded");
   m.runTimers();
@@ -1084,8 +1177,26 @@ test("a successful scan caches the subtitle for the next open", () => {
   m.fromWebView("sidebar", "setDddEnabled", { enabled: true });
   m.fromWebView("sidebar", "episodeSelected", EPISODE);
   assert.equal(writes.length, 1, "the scanned subtitle was not cached");
-  assert.equal(writes[0][0], "@data/sidekick-sub-1399-1-2.srt");
+  assert.match(writes[0][0], /^@data\/sidekick-sub-1399-1-2--\d+\.srt$/,
+    `cache path was ${writes[0][0]}`);
   assert.equal(writes[0][1], SRT);
+  assert.deepEqual(deletes, ["@data/sidekick-sub-1399-1-2--111.srt"],
+    "the previous copy for this episode was not replaced");
+});
+
+test("the subtitle cache keeps only the newest files", () => {
+  const { g } = boot();
+  const files = [
+    { filename: "sidekick-sub-36658--1--1--100.srt", path: "@data/a" },
+    { filename: "sidekick-sub-36658--1--1--300.srt", path: "@data/b" },
+    { filename: "sidekick-sub-1399-1-2--200.srt", path: "@data/c" },
+    { filename: "other.txt", path: "@data/d" },
+    { filename: "sidekick-sub-broken.srt", path: "@data/e" }
+  ];
+  assert.equal(g.subtitleFilesToPrune(files, 3).length, 0, "nothing should go under the cap");
+  // Joined, because the array is built inside the vm realm.
+  assert.equal(g.subtitleFilesToPrune(files, 2).join(","), "@data/a",
+    "the oldest cached subtitle was kept");
 });
 
 test("a remembered subtitle auto-loads when none of the user's is selected", () => {
@@ -1350,12 +1461,151 @@ test("the auto-card toggle stores and pushes, and boot pushes it", () => {
   assert.equal(posted(booted, "setDddAutoCard").pop().enabled, false, "boot ignored the saved setting");
 });
 
+test("a recent pick pushes that title's marks before selecting it", () => {
+  const info = Object.assign({}, EP_INFO, { tmdbId: "777" });
+  const h = loadSidebar({ storage: {
+    epinfo_recents: JSON.stringify([{ info: info, lastUsed: 1, pinned: false }]),
+    epinfo_marks: JSON.stringify({ "777:-1:-1": [
+      { id: "m1", label: "recent mark", start: 50, safe: null, action: "silent" }
+    ] })
+  }});
+  h.global.applyRecent(0);
+  const pushed = posted(h, "setSceneMarks").pop();
+  assert.equal(pushed.marks.length, 1, "the recent pick did not push its marks");
+  assert.equal(pushed.marks[0].label, "recent mark");
+  const names = h.iina._posted.map((x) => x.name);
+  assert.ok(names.indexOf("setSceneMarks") < names.indexOf("episodeSelected"),
+    "marks must arrive before the selection");
+});
+
+test("a scan while editing does not move the save onto another mark", () => {
+  const h = loadSidebar({ storage: {
+    epinfo_ep: JSON.stringify(EP_INFO),
+    epinfo_marks: JSON.stringify({ "550:-1:-1": [
+      { label: "A", start: 1000, safe: 1100 },
+      { label: "B", start: 2000, safe: 2100 }
+    ] })
+  }});
+  h.global.doMarkEdit(1);                       // editing B
+  h.document.getElementById("mark-edit-label").value = "B edited";
+  h.document.getElementById("mark-edit-start").value = "2:05";
+  // A scan adds a mark before both, re-sorting the list under the editor.
+  h.iina._emit("subScanResult", { ok: true, cues: 1, proposals: [{ label: "moaning", start: 50, safe: 60 }] });
+  h.document.getElementById("mark-edit-label").value = "B edited";
+  h.document.getElementById("mark-edit-start").value = "2:05";
+  h.global.doEditSave();
+
+  const marks = storedMarks(h);
+  const b = marks.filter((m) => m.label === "B edited")[0];
+  const a = marks.filter((m) => m.label === "A")[0];
+  assert.ok(b, "the edit did not land on B");
+  assert.equal(b.start, 125, `B start is ${b.start}`);
+  assert.equal(a.start, 1000, "the edit overwrote a different mark");
+});
+
+test("typed times survive a type change", () => {
+  const h = loadSidebar({ storage: {
+    epinfo_ep: JSON.stringify(EP_INFO),
+    epinfo_marks: JSON.stringify({ "550:-1:-1": [{ label: "m", start: 100, safe: 130 }] })
+  }});
+  h.global.doMarkEdit(0);
+  h.document.getElementById("mark-edit-start").value = "5:00";
+  h.document.getElementById("mark-edit-end").value = "6:00";
+  h.global.doEditType("auto");
+  h.global.doEditSave();
+  const marks = storedMarks(h);
+  assert.equal(marks[0].start, 300, "typed start lost on the type change");
+  assert.equal(marks[0].safe, 360, "typed end lost on the type change");
+  assert.equal(marks[0].action, "auto");
+});
+
+test("a file change drops pending and armed mark state", () => {
+  const h = loadSidebar({ storage: {
+    epinfo_ep: JSON.stringify(EP_INFO),
+    epinfo_marks: JSON.stringify({ "550:-1:-1": [{ label: "a", start: 100, safe: null }] })
+  }});
+  h.global.doMarkTrigger();
+  h.iina._emit("timeCaptured", { kind: "trigger", seconds: 60 });
+  h.global.doMarkClearAll();                    // arm the two-tap clear
+  assert.equal(h.document.getElementById("ddd-marks-clear").textContent, "Sure?");
+
+  h.iina._emit("fileChanged", { url: "file:///v/Other S01E01.mkv" });
+  assert.equal(h.document.getElementById("ddd-marks-clear").textContent, "Clear all",
+    "the armed clear survived the file change");
+  assert.equal(h.document.getElementById("ddd-mark-pending").style.display, "none",
+    "the pending trigger survived the file change");
+
+  // The pending trigger must not be saved under any title now.
+  h.global.doMarkWarnOnly();
+  assert.equal(storedMarks(h).length, 1, "the previous file's pending trigger was saved");
+
+  // One tap arms again rather than clearing.
+  h.global.doMarkClearAll();
+  assert.equal(storedMarks(h).length, 1,
+    "one tap after a file change cleared the marks");
+});
+
+test("a start/end capture with no editor open is dropped", () => {
+  const h = loadSidebar({ storage: { epinfo_ep: JSON.stringify(EP_INFO) } });
+  h.iina._emit("timeCaptured", { kind: "start", seconds: 42 });
+  assert.equal(h.document.getElementById("ddd-mark-pending").style.display, "none",
+    "an orphaned editor capture became a trigger");
+  assert.equal(h.document.getElementById("ddd-mark-pending").innerHTML, "");
+});
+
+test("an unknown stored tab falls back to cues", () => {
+  const h = loadSidebar({ storage: { epinfo_ddd_tab: "nonsense" } });
+  assert.equal(h.document.getElementById("ddd-pane-cues").style.display, "block");
+  assert.equal(h.document.getElementById("ddd-pane-flags").style.display, "none");
+});
+
+test("marks age out, and legacy arrays are kept", () => {
+  const old = Date.now() - 181 * 86400000;
+  const h = loadSidebar({ storage: {
+    epinfo_marks: JSON.stringify({
+      "1:-1:-1": { marks: [{ label: "old", start: 1, safe: null, action: "warn" }], lastSeen: old },
+      "2:-1:-1": { marks: [{ label: "kept", start: 2, safe: null, action: "warn" }], lastSeen: Date.now() },
+      "3:-1:-1": [{ label: "legacy", start: 3, safe: null }]
+    })
+  }});
+  assert.equal(h.global.pruneMarks(), 1, "the aged entry was not dropped");
+  const left = JSON.parse(h.localStorage.getItem("epinfo_marks"));
+  assert.equal(left["1:-1:-1"], undefined, "an aged entry survived");
+  assert.ok(left["2:-1:-1"], "a fresh entry was dropped");
+  assert.ok(left["3:-1:-1"], "a pre-timestamp entry was dropped");
+});
+
+test("the title cap evicts scan-only entries before curated ones", () => {
+  const marks = {};
+  const now = Date.now();
+  // One curated entry, older than everything but inside the age window, then
+  // the scan-only flood.
+  marks["1:-1:-1"] = { marks: [{ label: "mine", start: 1, safe: null, action: "auto" }], lastSeen: now - 10000000 };
+  for (let i = 0; i < 400; i++) {
+    marks[(1000 + i) + ":-1:-1"] =
+      { marks: [{ label: "tag", start: 1, safe: null, action: "silent" }], lastSeen: now - i };
+  }
+  const h = loadSidebar({ storage: { epinfo_marks: JSON.stringify(marks) } });
+  h.global.pruneMarks();
+  const left = JSON.parse(h.localStorage.getItem("epinfo_marks"));
+  assert.equal(Object.keys(left).length, 400, "the title cap was not applied");
+  assert.ok(left["1:-1:-1"], "the curated entry was evicted before scan-only ones");
+});
+
 // ── Sidebar marks ──────────────────────────────────────────────────
 
 const EP_INFO = {
   showTitle: "X2", epTitle: "X2", code: "", context: "", airDate: "", rating: "",
   overview: "", posterUrl: "", logoUrl: "", tmdbId: "550", isMovie: true
 };
+
+// The stored marks for a title, whichever schema wrote them: a bare array
+// (pre-timestamp) or { marks, lastSeen }.
+function storedMarks(h, key) {
+  const v = JSON.parse(h.localStorage.getItem("epinfo_marks") || "{}")[key || "550:-1:-1"];
+  if (Array.isArray(v)) return v;
+  return (v && v.marks) || [];
+}
 
 test("marking a trigger then a skip-to stores and pushes the pair", () => {
   const h = loadSidebar({ storage: { epinfo_ep: JSON.stringify(EP_INFO) } });
@@ -1370,7 +1620,7 @@ test("marking a trigger then a skip-to stores and pushes the pair", () => {
   assert.equal(posted(h, "captureTime").pop().kind, "safe");
   h.iina._emit("timeCaptured", { kind: "safe", seconds: 660 });
 
-  const marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  const marks = storedMarks(h);
   assert.equal(marks.length, 1, "the pair was not stored");
   assert.equal(marks[0].start, 600);
   assert.equal(marks[0].safe, 660);
@@ -1385,9 +1635,10 @@ test("a mark saved warn-only carries no target", () => {
   h.global.doMarkTrigger();
   h.iina._emit("timeCaptured", { kind: "trigger", seconds: 100 });
   h.global.doMarkWarnOnly();
-  const marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  const marks = storedMarks(h);
   assert.equal(marks.length, 1);
   assert.equal(marks[0].safe, null);
+  assert.equal(marks[0].action, "warn", "a warn-only mark was typed as skip");
 });
 
 test("a skip-to before the trigger is refused", () => {
@@ -1417,7 +1668,7 @@ test("clearing all marks takes two taps", () => {
     epinfo_marks: JSON.stringify({ "550:-1:-1": [{ label: "a", start: 100, safe: null }] })
   }});
   h.global.doMarkClearAll();
-  assert.equal(JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"].length, 1,
+  assert.equal(storedMarks(h).length, 1,
     "one tap cleared the marks");
   assert.equal(h.document.getElementById("ddd-marks-clear").textContent, "Sure?");
 
@@ -1467,7 +1718,7 @@ test("the editor saves typed times, and clearing the end means warn-only", () =>
   h.document.getElementById("mark-edit-start").value = "4:04";
   h.document.getElementById("mark-edit-end").value = "4:30";
   h.global.doEditSave();
-  let marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  let marks = storedMarks(h);
   assert.equal(marks[0].start, 244);
   assert.equal(marks[0].safe, 270);
   assert.equal(posted(h, "setSceneMarks").pop().marks[0].start, 244, "the edit was not pushed");
@@ -1475,7 +1726,7 @@ test("the editor saves typed times, and clearing the end means warn-only", () =>
   h.global.doMarkEdit(0);
   h.document.getElementById("mark-edit-end").value = "";
   h.global.doEditSave();
-  marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  marks = storedMarks(h);
   assert.equal(marks[0].safe, null, "clearing the end did not make it warn-only");
 });
 
@@ -1491,7 +1742,7 @@ test("the editor changes a mark's type, and refuses unknown ones", () => {
   h.document.getElementById("mark-edit-start").value = "1:40";
   h.document.getElementById("mark-edit-end").value = "2:10";
   h.global.doEditSave();
-  let marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  let marks = storedMarks(h);
   assert.equal(marks[0].action, "auto");
   assert.equal(posted(h, "setSceneMarks").pop().marks[0].action, "auto", "the type was not pushed");
 
@@ -1500,7 +1751,7 @@ test("the editor changes a mark's type, and refuses unknown ones", () => {
   h.document.getElementById("mark-edit-start").value = "1:40";
   h.document.getElementById("mark-edit-end").value = "2:10";
   h.global.doEditSave();
-  marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  marks = storedMarks(h);
   assert.equal(marks[0].action, "warn");
 
   // An unknown type is refused rather than stored.
@@ -1509,7 +1760,7 @@ test("the editor changes a mark's type, and refuses unknown ones", () => {
   h.document.getElementById("mark-edit-start").value = "1:40";
   h.document.getElementById("mark-edit-end").value = "2:10";
   h.global.doEditSave();
-  marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  marks = storedMarks(h);
   assert.equal(marks[0].action, "warn");
 });
 
@@ -1523,7 +1774,7 @@ test("the editor saves a custom title, and an empty one falls back", () => {
   h.document.getElementById("mark-edit-start").value = "1:40";
   h.document.getElementById("mark-edit-end").value = "2:10";
   h.global.doEditSave();
-  let marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  let marks = storedMarks(h);
   assert.equal(marks[0].label, "Mystique bathroom scene");
   assert.match(h.document.getElementById("ddd-marks").innerHTML, /Mystique bathroom scene/,
     "the custom title was not painted");
@@ -1533,7 +1784,7 @@ test("the editor saves a custom title, and an empty one falls back", () => {
   h.document.getElementById("mark-edit-start").value = "1:40";
   h.document.getElementById("mark-edit-end").value = "2:10";
   h.global.doEditSave();
-  marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  marks = storedMarks(h);
   assert.equal(marks[0].label, "your mark", "an empty title did not fall back");
 });
 
@@ -1547,7 +1798,7 @@ test("the editor refuses an end before the start", () => {
   h.document.getElementById("mark-edit-end").value = "4:00";
   h.global.doEditSave();
   assert.match(h.document.getElementById("ddd-status").textContent, /after the start/);
-  const marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  const marks = storedMarks(h);
   assert.equal(marks[0].start, 100, "an invalid edit was saved");
 });
 
@@ -1572,6 +1823,10 @@ test("preview buttons seek five seconds before the point", () => {
   h.global.doPreviewStart(0);
   assert.equal(posted(h, "seekToTime").pop().seconds, 95, "the row preview is not start-5");
   h.global.doMarkEdit(0);
+  // The editor pulls typed values from its fields before previewing; the
+  // harness never populates inputs from innerHTML, so set them here.
+  h.document.getElementById("mark-edit-start").value = "1:40";
+  h.document.getElementById("mark-edit-end").value = "3:20";
   h.global.doPreviewEditLanding();
   assert.equal(posted(h, "seekToTime").pop().seconds, 195, "the landing preview is not end-5");
   h.global.doEditCancel();
@@ -1592,7 +1847,7 @@ test("a scan result adds marks and a rescan does not stack duplicates", () => {
     { label: "kissing", start: 500, safe: 503 },
     { label: "t", start: 700, safe: 700 }              // degenerate safe -> warn only
   ]});
-  let marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  let marks = storedMarks(h);
   assert.equal(marks.length, 3);
   assert.equal(marks[0].label, "moaning");
   assert.equal(marks[2].safe, null, "a degenerate safe was kept");
@@ -1603,7 +1858,7 @@ test("a scan result adds marks and a rescan does not stack duplicates", () => {
     { label: "kissing", start: 500, safe: 503 },
     { label: "screaming", start: 900, safe: 903 }
   ]});
-  marks = JSON.parse(h.localStorage.getItem("epinfo_marks"))["550:-1:-1"];
+  marks = storedMarks(h);
   assert.equal(marks.length, 4, "the rescan stacked duplicates");
   assert.equal(marks[3].label, "screaming");
 });

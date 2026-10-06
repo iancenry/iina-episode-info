@@ -46,6 +46,9 @@
     // The folder map ages identically. Without this it was the one map that
     // only ever grew, holding pins for folders that no longer exist.
     pruneFolderMap();
+    // Marks age like the maps, with a cap over that; scanner runs made this
+    // store partly a cache, not only a record of manual work.
+    pruneMarks();
 
     // All settings have been pushed, so tell main.js it is safe to re-emit
     // fileChanged so we can do the per-URL TMDB restore.

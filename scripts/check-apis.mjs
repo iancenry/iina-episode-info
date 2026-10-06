@@ -269,10 +269,15 @@ async function checkSkipSources() {
   const sources = [
     { name: "IntroDB", url: `https://api.introdb.app/segments?${qs}`,
       valid: (j) => j && "intro" in j, shape: "`intro` key" },
+    // The fixture is a heavily-subtitled show, so an array must actually be
+    // there; the old predicate passed on `{}`.
     { name: "TheIntroDB", url: `https://api.theintrodb.org/v2/media?${qs}`,
-      valid: (j) => j && (!("intro" in j) || Array.isArray(j.intro)), shape: "`intro` array" },
+      valid: (j) => j && (Array.isArray(j.intro) || Array.isArray(j.credits)),
+      shape: "`intro`/`credits` arrays" },
+    // typeof null is "object", so the old predicate passed on a nulled body.
     { name: "SkipDB", url: `https://api.skipdb.tv/api/segments?${qs}`,
-      valid: (j) => j && typeof j.segments === "object", shape: "`segments` object" },
+      valid: (j) => j && j.segments && typeof j.segments === "object" && !Array.isArray(j.segments),
+      shape: "`segments` object" },
   ];
 
   const ok = [], blocked = [], broken = [];
@@ -309,12 +314,12 @@ async function checkSkipSources() {
 //    than fails; a changed contract still fails.
 async function checkAnimeChain() {
   const ANIME = { imdb: "tt2560140", name: "Attack on Titan", mal: 16498 };
-  const soft = [], hard = [];
+  const blocked = [], down = [], hard = [];
 
   let mal = null;
   try {
     const arm = await get(`https://arm.haglund.dev/api/v2/imdb?id=${ANIME.imdb}&include=myanimelist`);
-    if ([401, 403, 429].includes(arm.status)) soft.push(`ARM HTTP ${arm.status}`);
+    if ([401, 403, 429].includes(arm.status)) blocked.push(`ARM HTTP ${arm.status}`);
     else if (arm.status !== 200) hard.push(`ARM HTTP ${arm.status}`);
     else if (!Array.isArray(arm.json)) hard.push("ARM no longer returns an array");
     else {
@@ -322,17 +327,17 @@ async function checkAnimeChain() {
       if (!mal) hard.push(`ARM stopped mapping ${ANIME.name} to a MyAnimeList id`);
     }
   } catch (err) {
-    soft.push(`ARM unreachable (${err.message})`);
+    down.push(`ARM unreachable (${err.message})`);
   }
 
   try {
     const r = await get(`https://api.aniskip.com/v2/skip-times/${mal || ANIME.mal}/1?types[]=op&types[]=ed&episodeLength=0`);
-    if ([401, 403, 429].includes(r.status)) soft.push(`AniSkip HTTP ${r.status}`);
+    if ([401, 403, 429].includes(r.status)) blocked.push(`AniSkip HTTP ${r.status}`);
     else if (r.status !== 200) hard.push(`AniSkip HTTP ${r.status}`);
     else if (!r.json || typeof r.json.found !== "boolean") hard.push("AniSkip response lost its `found` flag");
     else if (r.json.found && !Array.isArray(r.json.results)) hard.push("AniSkip `results` is no longer an array");
   } catch (err) {
-    soft.push(`AniSkip unreachable (${err.message})`);
+    down.push(`AniSkip unreachable (${err.message})`);
   }
 
   need(hard.length === 0, hard.join("; "));
@@ -340,8 +345,10 @@ async function checkAnimeChain() {
   // warning let the daily job exit 0, which closed the tracking issue with
   // "All APIs are healthy again" while anime intro timings were dead for
   // everyone. A blocked-or-rate-limited runner stays a warning; total silence
-  // does not.
-  need(soft.length < 2, `both anime providers unreachable: ${soft.join("; ")}`);
+  // does not — and the two were lumped together until this split, so both
+  // blocked also failed the job.
+  need(down.length < 2, `both anime providers unreachable: ${down.join("; ")}`);
+  const soft = blocked.concat(down);
   if (soft.length) return { warn: `${soft.join(", ")} with anime lookups unavailable from this runner` };
   return { detail: `ARM maps ${ANIME.name} to MAL ${mal}, AniSkip answering` };
 }
@@ -359,6 +366,14 @@ async function checkDdd() {
   if (items.status === 403 && items.headers.get("cf-mitigated")) {
     if (!key) return { skip: "no DDD_API_KEY secret; Cloudflare challenge answers, zone alive" };
     return { warn: "Cloudflare challenged this runner; DDD lookups unverified from here" };
+  }
+  // A rate limit or a plain WAF refusal is the runner's problem, not the
+  // service's; the skip-source probe classifies these the same way.
+  if (items.status === 429) {
+    return { warn: "DDD rate-limited this runner; lookups unverified from here" };
+  }
+  if (items.status === 403) {
+    return { warn: "DDD refused this runner (HTTP 403); lookups unverified from here" };
   }
   if (!key) {
     need(items.status === 401, `no-key probe: expected 401, got HTTP ${items.status}`);

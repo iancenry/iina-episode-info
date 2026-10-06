@@ -6,7 +6,7 @@
 // naming 1.3.1 was really 1.4.0).
 // ============================================================
 
-const { core, event, overlay, sidebar, menu } = iina;   // utils and file were never used
+const { core, event, overlay, sidebar, menu } = iina;   // utils is unused; file is read for subtitle scanning
 
 // ── Helpers ──────────────────────────────────
 // Convert any thrown value / API error payload into a readable string.
@@ -508,8 +508,10 @@ async function resolveSegments(info, forceRefresh) {
   } catch (e) {
     // Every call site is fire-and-forget, so a throw here would be an unhandled
     // rejection and no skipResult would ever be posted: the button would sit on
-    // "Searching…" for the rest of the session.
+    // "Searching…" for the rest of the session. The stale report is what
+    // re-enables it; an abandoned run does the same thing for the same reason.
     log("skip lookup failed: " + errStr(e));
+    try { reportSkip(info, [], true); } catch (e2) {}
   }
 }
 
@@ -616,11 +618,11 @@ async function resolveSegmentsInner(info, forceRefresh) {
   report(segments);
 }
 
-// Lets the sidebar's "Search again" button stop spinning and report.
-// The cache is bounded because nothing else is: one entry per episode watched,
-// held for the whole session, and a long evening adds hundreds. Oldest entries
-// go first, and the cap is deliberately far above a normal viewing session, so
-// the eviction only ever runs for someone who has left it playing.
+// The segment cache is bounded because nothing else is: one entry per episode
+// watched, held for the whole session, and a long evening adds hundreds.
+// Oldest entries go first, and the cap is deliberately far above a normal
+// viewing session, so the eviction only ever runs for someone who has left it
+// playing.
 var SEGMENT_CACHE_MAX = 400;
 
 function rememberSegments(key, list) {
@@ -773,6 +775,20 @@ function startTimeWatcher() {
     // is an action rather than a cue, so it fires even when scene cues are
     // hidden — only its card follows the auto-card setting.
     if (scenes.length) {
+      // A scene at 0:00 has no earlier position to be crossed from, so an
+      // auto mark there fires from the opening moments instead — but only
+      // when playback genuinely began at the start (the first observed
+      // position is at the very beginning), never on a resume or a seek.
+      if (lastTimePos == null && t <= 2) {
+        for (var a0 = 0; a0 < scenes.length; a0++) {
+          var sc0 = scenes[a0];
+          if (sc0.skipped || sc0.cancelled || sc0.action !== "auto") continue;
+          if (sc0.start <= 0 && sc0.safe != null && sc0.strong) {
+            skipSceneTo(sc0);
+            break;
+          }
+        }
+      }
       // Auto-skip only fires when playback crosses the line in one small step.
       // A seek is a jump larger than SCENE_SEEK_GAP and lands where the user
       // pointed on purpose, so it must not trigger a skip.
@@ -960,7 +976,16 @@ function mergeSceneCues(list) {
         cur.action = next.action;
         cur.strong = next.strong;
         cur.superId = next.superId;
+      } else if (actionRank(next.action) === actionRank(cur.action)) {
+        // Equal strength: a moment is skippable if either member says so.
+        cur.strong = cur.strong || next.strong;
       }
+      // The pen and the attribution follow the data's origin, and a moment is
+      // the user's own only when every cue in it is. A mixed moment stays in
+      // the databases' list and carries their attribution; claiming it as
+      // "your mark" would hide a database cue from the sidebar, and the
+      // reverse would present the user's own work as database data.
+      cur.local = !!cur.local && !!next.local;
     } else {
       out.push(next);
     }
@@ -1161,9 +1186,10 @@ async function resolveScenes(info, forceRefresh) {
   try {
     await resolveScenesInner(info, forceRefresh);
   } catch (e) {
-    // Fire-and-forget like every resolveSegments caller: a throw here would be
-    // an unhandled rejection, and the sidebar's button would spin forever.
+    // Same reasoning as resolveSegments: a throw must still answer, or the
+    // sidebar's "Search again" button spins for the rest of the session.
     log("scene lookup failed: " + errStr(e));
+    try { reportScenes([], [], true); } catch (e2) {}
   }
 }
 
@@ -1419,7 +1445,9 @@ function undoScene() {
   if (!activeScene || sceneMode !== "undo") return;
   var scene = activeScene;
   hideSceneCue();
-  var target = Math.max(0, scene.start - 1);
+  // Through the same clamp as every other seek, so the file's own invariant
+  // holds on this path too.
+  var target = clampedSeekTarget(Math.max(0, scene.start - 1));
   var how = seekAbsolute(target);
   if (how !== null) {
     iina.console.log("[EpInfo] undid the auto-skip of \"" + scene.label + "\", back to " + target + "s");
@@ -1474,13 +1502,14 @@ var SUB_LEXICON = [
 ];
 
 // H:M:S.frac to seconds. SRT gives milliseconds (3 digits), ASS centiseconds
-// (2), and the odd file gives deciseconds (1); each has to scale.
+// (2), and the odd file gives deciseconds (1); each has to scale. Fields are
+// defaulted, because WebVTT permits the hours to be left out entirely.
 function subtitleSec(h, m, s, frac) {
   var digits = String(frac == null ? "" : frac).length;
   var f = Number(frac || 0);
   if (digits === 2) f *= 10;
   else if (digits === 1) f *= 100;
-  return Number(h) * 3600 + Number(m) * 60 + Number(s) + (f / 1000);
+  return (Number(h) || 0) * 3600 + (Number(m) || 0) * 60 + (Number(s) || 0) + (f / 1000);
 }
 
 function parseAssTime(s) {
@@ -1512,8 +1541,9 @@ function parseSubtitleText(text) {
   if (cues.length) return cues;
 
   // SRT and WebVTT: a timestamp line, then text until a blank line. VTT
-  // settings after the end time ("align:middle") are ignored by the pattern.
-  var TIME = /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})/;
+  // settings after the end time ("align:middle") are ignored by the pattern,
+  // and the hours field is optional — WebVTT permits "MM:SS.mmm".
+  var TIME = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->\s*(?:(\d{1,2}):)?(\d{1,2}):(\d{2})[,.](\d{1,3})/;
   for (i = 0; i < lines.length; i++) {
     var m = TIME.exec(lines[i]);
     if (!m) continue;
@@ -1547,7 +1577,7 @@ function cueTags(text) {
 // a real SDH track (X2's bar scene: tag 46:27, last line 47:13, cut 47:18).
 var SUB_EXTEND_GAP = 10;   // seconds of silence that ends the run
 var SUB_EXTEND_PAD = 5;    // silence after the last line before the cut
-var SUB_EXTEND_MAX = 120;  // longest a proposal may be
+var SUB_EXTEND_MAX = 120;  // cap on the caption run, before the pad is added
 
 function subtitleProposals(cues) {
   var list = Array.isArray(cues) ? cues : [];
@@ -1604,16 +1634,80 @@ function subtitleEpisodeKey(info) {
 
 function subtitleCachePath(info) {
   var k = subtitleEpisodeKey(info);
-  return k ? ("@data/sidekick-sub-" + k.replace(/:/g, "-") + ".srt") : "";
+  // The write time is baked into the name: the file API exposes no
+  // modification time, so this is what lets the cache be bounded later.
+  return k ? ("@data/sidekick-sub-" + k.replace(/:/g, "-") + "--" + Date.now() + ".srt") : "";
+}
+
+// The cached copy for this episode, newest-epoch file winning, with the
+// fixed-name form from before the epoch naming as a fallback so copies
+// written by an older build keep working until they are rewritten.
+function cachedSubtitlePath(info) {
+  var k = subtitleEpisodeKey(info);
+  if (!k) return "";
+  var prefix = "sidekick-sub-" + k.replace(/:/g, "-") + "--";
+  try {
+    if (typeof iina.file.list === "function") {
+      var files = iina.file.list("@data") || [];
+      for (var i = 0; i < files.length; i++) {
+        var name = (files[i] && files[i].filename) || "";
+        if (name.indexOf(prefix) === 0) return files[i].path || ("@data/" + name);
+      }
+    }
+    var legacy = "@data/sidekick-sub-" + k.replace(/:/g, "-") + ".srt";
+    if (typeof iina.file.exists === "function" && iina.file.exists(legacy)) return legacy;
+  } catch (e) {}
+  return "";
 }
 
 function rememberSubtitle(info, text) {
   if (!text || typeof text !== "string") return;
-  var p = subtitleCachePath(info);
-  if (!p) return;
+  var k = subtitleEpisodeKey(info);
+  if (!k) return;
+  var prefix = "sidekick-sub-" + k.replace(/:/g, "-") + "--";
   try {
-    if (typeof iina.file.write === "function") iina.file.write(p, text);
+    if (typeof iina.file.write !== "function") return;
+    // One cached copy per episode: an earlier one for the same key goes
+    // before the new one is written.
+    if (typeof iina.file.list === "function" && typeof iina.file.delete === "function") {
+      var files = [];
+      try { files = iina.file.list("@data") || []; } catch (e) { files = []; }
+      files.forEach(function(f) {
+        var name = (f && f.filename) || "";
+        if (name.indexOf(prefix) === 0) {
+          try { iina.file.delete(f.path || ("@data/" + name)); } catch (e) {}
+        }
+      });
+    }
+    iina.file.write(subtitleCachePath(info), text);
   } catch (e) { /* caching is best-effort */ }
+}
+
+// How many cached subtitle files to keep. Each is roughly 100 KB, so this
+// bounds the directory near a dozen megabytes; beyond it, the oldest by the
+// epoch in the name go. Pure, so the bound is testable without a file system.
+var SUB_CACHE_MAX = 120;
+function subtitleFilesToPrune(files, cap) {
+  var mine = [];
+  (Array.isArray(files) ? files : []).forEach(function(f) {
+    var name = (f && (f.filename || f.path)) || "";
+    var m = /^sidekick-sub-(.+?)--(\d+)\.srt$/.exec(name);
+    if (m) mine.push({ path: (f.path || name), ts: Number(m[2]) });
+  });
+  if (mine.length <= cap) return [];
+  mine.sort(function(a, b) { return b.ts - a.ts; });
+  return mine.slice(cap).map(function(x) { return x.path; });
+}
+
+function pruneSubtitleCache() {
+  try {
+    if (!iina.file || typeof iina.file.list !== "function" || typeof iina.file.delete !== "function") return;
+    var files = [];
+    try { files = iina.file.list("@data") || []; } catch (e) { return; }
+    subtitleFilesToPrune(files, SUB_CACHE_MAX).forEach(function(p) {
+      try { iina.file.delete(p); } catch (e) {}
+    });
+  } catch (e) {}
 }
 
 // Registered with the other sidebar handlers, after the page loads.
@@ -1715,9 +1809,9 @@ function autoScanStep() {
 function tryLoadCachedSubtitle() {
   try {
     if (!dddEnabled || !currentEpisode) return;
-    if (!iina.file || typeof iina.file.exists !== "function") return;
-    var p = subtitleCachePath(currentEpisode);
-    if (!p || !iina.file.exists(p)) return;
+    if (!iina.file || (typeof iina.file.exists !== "function" && typeof iina.file.list !== "function")) return;
+    var p = cachedSubtitlePath(currentEpisode);
+    if (!p) return;
     var tracks = [];
     try { tracks = core.subtitle.tracks || []; } catch (e) {}
     var hasExternal = false;
@@ -1799,6 +1893,7 @@ function registerSidebarHandlers() {
     scenes = [];
     dddFlags = [];
     localMarks = [];
+    subtitleScanDone = {};
     activeScene = null;
     lastTimePos = null;
     hideSceneCue();
@@ -2068,6 +2163,9 @@ event.on("iina.window-loaded", function() {
   // load; the sidebar uses the same delay for the same reason.
   setTimeout(registerOverlayHandlers, 500);
   setupSidebar();
+  // The subtitle cache is files, not localStorage: bound it at launch, when
+  // nothing is waiting on a scan.
+  pruneSubtitleCache();
 });
 
 event.on("iina.file-loaded", function() {

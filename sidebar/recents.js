@@ -107,7 +107,12 @@ function applyRecent(idx) {
   try { localStorage.setItem("epinfo_ep", JSON.stringify(r.info)); } catch(e) {}
   saveCurrentUrlInfo(r.info);
   showSaved(r.info);
+  // The marks for this identification travel ahead of the selection, as they
+  // do on every other pick path; without this main.js kept the previous
+  // title's marks live for the newly picked one.
+  iina.postMessage("setSceneMarks", { marks: marksFor(r.info) });
   iina.postMessage("episodeSelected", r.info);
+  if (typeof paintMarks === "function") paintMarks();
   selShow = null; selSeason = null; episodeCache = [];
   resetPanel();
   renderRecents();

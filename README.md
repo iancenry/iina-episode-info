@@ -121,14 +121,16 @@ The window title, the macOS media panel and IINA's playlist read mpv's
 `media-title`, so they show `Severance · In Perpetuity` instead of echoing
 `Severance.S02E03.1080p.WEB-DL.DDP5.1.H.264-NTb.mkv`.
 
-### Contacts nothing but TMDB
+### What it contacts
 
-Two permissions: `video-overlay`, `network-request`. No analytics, no
-tracking, no telemetry. `Info.json` declares exactly the hosts below and
-nothing else, and CI fails the build if the code ever calls a host outside that
-list, from script code or from markup.
+Three permissions: `video-overlay`, `network-request`, and `file-system`, the
+last so the opt-in scene scan can read the external subtitle you have loaded.
+No analytics, no tracking, no telemetry. `Info.json` declares exactly the hosts
+below and nothing else, and CI fails the build if the code ever calls a host
+outside that list, from script code or from markup.
 
-Turn skip intro on and five further community services are contacted. See
+With nothing opted in, only TMDB is contacted. Skip intro adds five further
+community services, and scene content warnings adds DoesTheDogDie. See
 Privacy.
 
 ## Requirements
@@ -226,6 +228,8 @@ This plugin contacts:
   only if skip intro is on
 - `arm.haglund.dev` / `api.aniskip.com` for anime intro timings, only if skip
   intro is on
+- `www.doesthedogdie.com` for scene content warnings, only if that feature is
+  on with its own key
 
 No analytics, no tracking, no telemetry. `Info.json` declares exactly these
 hosts and nothing else, and CI fails the build if the code ever calls a host
@@ -255,9 +259,9 @@ Piece, and the reason `IMG_1234.MOV` is left alone instead of being read as
 episode 1234 of a show called IMG.
 
 `check-apis.mjs` runs daily in CI, probing each endpoint and opening (then
-auto-closing) an issue if one breaks. Add `TMDB_API_KEY` to `.env` to verify
-response shapes as well; without it the endpoints are still proven alive and
-enforcing auth.
+auto-closing) an issue if one breaks. Add `TMDB_API_KEY` and `DDD_API_KEY` to
+`.env` to verify response shapes as well; without them the endpoints are still
+proven alive and enforcing auth.
 
 ## Attribution
 

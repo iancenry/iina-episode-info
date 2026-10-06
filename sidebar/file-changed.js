@@ -14,6 +14,10 @@ iina.onMessage("fileChanged", function(d){
   if (nextUrl === currentVideoUrl) return;
   currentVideoUrl = nextUrl;
   invalidateLookups();
+  // A half-finished mark belongs to the file that was playing; carrying a
+  // pending trigger or an armed clear into the next one would attach it to
+  // the wrong title.
+  if (typeof resetMarkUiState === "function") resetMarkUiState();
 
   // Reset search panel state regardless
   document.getElementById("q").value = "";

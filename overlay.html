@@ -274,7 +274,7 @@
   </button>
   <!-- DDD's attribution is contractually required wherever their data
        appears, and this card is one of those places. -->
-  <div id="cue-sub"><span id="cue-times"></span><span id="cue-hint"></span> &middot; Powered by <a href="https://www.doesthedogdie.com" target="_blank" rel="noopener">DoesTheDogDie.com</a></div>
+  <div id="cue-sub"><span id="cue-times"></span><span id="cue-hint"></span><span id="cue-attr"> &middot; Powered by <a href="https://www.doesthedogdie.com" target="_blank" rel="noopener">DoesTheDogDie.com</a></span></div>
 </div>
 
 <script>
@@ -478,6 +478,9 @@ iina.onMessage("showCue", function(d) {
   var label = (d && d.label) ? d.label : "sensitive scene";
   // A pen for the user's own marks, the warning triangle for database data.
   document.getElementById("cue-ic").textContent = (d && d.local) ? "\u270E" : "\u26A0";
+  // And the database's attribution belongs only where its data does; a cue
+  // built from the user's own marks must not credit DoesTheDogDie.
+  document.getElementById("cue-attr").style.display = (d && d.local) ? "none" : "";
   document.getElementById("cue-label").textContent = CUE_LABELS[mode] + label;
   document.getElementById("cue-times").textContent =
     (d && d.at ? d.at : "") + (d && d.to ? " \u2192 " + d.to : "");
