@@ -70,11 +70,12 @@ const LOAD_ORDER = [
   "sidebar/pins.js",         // "this folder is that show"
   "sidebar/brackets.js",     // the bracket groups a fansub supplies
   "sidebar/identify.js",     // the candidate ladder and applyShowDetail
-  "sidebar/storage.js",      // URL -> episode map, and the saved card
+  "sidebar/storage.js",      // URL -> episode map, saved card, local marks storage
   "sidebar/file-changed.js", // the fileChanged handler
   "sidebar/search.js",       // manual search, htmlEsc
   "sidebar/picker.js",       // season and episode pills, saveSelection
-  "sidebar/settings.js",     // toggles, API key, sliders, theme  (two IIFEs)
+  "sidebar/settings.js",     // toggles, API key, sliders, theme, scene tabs
+  "sidebar/marks.js",        // your own trigger/skip-to marks (uses showDddMsg)
   "sidebar/recents.js",      // recent searches and recent picks
   "sidebar/boot.js"          // last: pushes saved settings, says sidebarReady
 ];

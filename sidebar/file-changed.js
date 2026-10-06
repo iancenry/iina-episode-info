@@ -66,12 +66,16 @@ iina.onMessage("fileChanged", function(d){
     try { localStorage.setItem("epinfo_ep", JSON.stringify(saved)); } catch(e) {}
     saveCurrentUrlInfo(saved);   // refresh lastSeen so it never ages out
     showSaved(saved);
+    iina.postMessage("setSceneMarks", { marks: marksFor(saved) });
     iina.postMessage("episodeSelected", saved);
+    if (typeof paintMarks === "function") paintMarks();
   } else if (!autoIdentify(currentVideoUrl)) {
     // Nothing usable in the filename, so fall back to a manual prompt.
     try { localStorage.removeItem("epinfo_ep"); } catch(e) {}
     document.getElementById("saved").classList.remove("on");
+    iina.postMessage("setSceneMarks", { marks: [] });
     iina.postMessage("clearEpisode", {});
+    if (typeof paintMarks === "function") paintMarks();
   }
   // else: autoIdentify is running and will replace the stale entry.
 });

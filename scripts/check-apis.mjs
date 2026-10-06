@@ -346,10 +346,75 @@ async function checkAnimeChain() {
   return { detail: `ARM maps ${ANIME.name} to MAL ${mal}, AniSkip answering` };
 }
 
+// DoesTheDogDie: scene content warnings, the second opt-in feature. Their API
+//    sits behind Cloudflare, which answers an unauthenticated request with a
+//    managed challenge (403 + cf-mitigated) rather than a JSON 401, so without
+//    the secret this can only prove the zone is alive. A wrong key gets a
+//    clean JSON 401 from the API itself.
+async function checkDdd() {
+  const key = process.env.DDD_API_KEY;
+  const opts = { headers: { "X-API-KEY": key || "INVALID_KEY_HEALTHCHECK" } };
+
+  const items = await get("https://www.doesthedogdie.com/api/v3/items?tmdb=1399", opts);
+  if (items.status === 403 && items.headers.get("cf-mitigated")) {
+    if (!key) return { skip: "no DDD_API_KEY secret; Cloudflare challenge answers, zone alive" };
+    return { warn: "Cloudflare challenged this runner; DDD lookups unverified from here" };
+  }
+  if (!key) {
+    need(items.status === 401, `no-key probe: expected 401, got HTTP ${items.status}`);
+    return { skip: "no DDD_API_KEY secret; 401 proves the route lives and enforces auth" };
+  }
+  need(items.status === 200, `items?tmdb HTTP ${items.status}`);
+  need(Array.isArray(items.json) && items.json.length > 0, "items?tmdb no longer returns a non-empty array");
+  need(items.json[0]?.tmdbId === 1399, `items[0].tmdbId was "${items.json[0]?.tmdbId}", expected 1399`);
+  const id = items.json[0].id;
+
+  const ratings = await get(`https://www.doesthedogdie.com/api/v3/items/${id}/ratings`, opts);
+  need(ratings.status === 200, `ratings HTTP ${ratings.status}`);
+  need(Array.isArray(ratings.json), "ratings no longer an array");
+  // The fields the parser reads. Position fields are H:M:S split across three
+  // numbers with -1 meaning "none"; a shape change here breaks scene parsing
+  // silently, which is exactly what this suite exists to catch.
+  need(
+    ratings.json.some((r) => r && "position1" in r && "safePosition1" in r && "topicId" in r && "index1" in r),
+    "ratings lost the position/safePosition/topicId/index fields"
+  );
+
+  const topics = await get("https://www.doesthedogdie.com/api/v3/topics", opts);
+  need(topics.status === 200, `topics HTTP ${topics.status}`);
+  need(Array.isArray(topics.json) && topics.json.some((t) => t && t.id != null && typeof t.name === "string"),
+    "topics no longer an array of {id, name}");
+
+  // The category chain behind the per-category settings: topics carry
+  // topicCategoryId, categories carry topicSuperCategoryId.
+  const cats = await get("https://www.doesthedogdie.com/api/v3/topiccategories", opts);
+  need(cats.status === 200, `topiccategories HTTP ${cats.status}`);
+  need(
+    Array.isArray(cats.json) && cats.json.some((c) => c && c.id != null && typeof c.name === "string" && "topicSuperCategoryId" in c),
+    "topiccategories no longer an array of {id, name, topicSuperCategoryId}"
+  );
+  const supers = await get("https://www.doesthedogdie.com/api/v3/topicsupercategories", opts);
+  need(supers.status === 200, `topicsupercategories HTTP ${supers.status}`);
+  need(Array.isArray(supers.json) && supers.json.some((s) => s && s.id != null && typeof s.name === "string"),
+    "topicsupercategories no longer an array of {id, name}");
+
+  // The item detail carries the vote totals that drive the untimed flags and
+  // the auto-skip majority guard.
+  const detail = await get(`https://www.doesthedogdie.com/api/v3/items/${id}`, opts);
+  need(detail.status === 200, `item detail HTTP ${detail.status}`);
+  need(
+    Array.isArray(detail.json?.topicItemStats) &&
+      detail.json.topicItemStats.some((s) => s && s.topicId != null && "yesSum" in s && "noSum" in s),
+    "item detail lost its topicItemStats {topicId, yesSum, noSum}"
+  );
+
+  return { detail: `items + ${ratings.json.length} ratings + ${topics.json.length} topics + ${cats.json.length} categories + ${supers.json.length} supercategories + item stats match the parser's expectations` };
+}
+
 // Run everything, then write the summary.
 const fromDotEnv = loadDotEnv();
 
-const KEY_NAMES = ["TMDB_API_KEY"];
+const KEY_NAMES = ["TMDB_API_KEY", "DDD_API_KEY"];
 const configured = KEY_NAMES.filter((k) => process.env[k]);
 
 console.log("Sidekick API health check");
@@ -369,6 +434,7 @@ await check("TMDB: response shape (search, ids, episodes)", checkTmdbShape);
 await check("TMDB: image CDN and poster paths", checkTmdbImages);
 await check("Skip-intro sources (IntroDB/TheIntroDB/SkipDB)", checkSkipSources);
 await check("Anime chain (ARM \u2192 AniSkip)", checkAnimeChain);
+await check("DoesTheDogDie: items, ratings, topics", checkDdd);
 await check("All allow-listed hosts reachable", checkAllowlistedHostsLive);
 
 const failed = results.filter((r) => r.status === "fail");
@@ -389,8 +455,8 @@ const summary = [
 
     if (skipped.length) {
   summary.push(
-    "> **Skipped checks** need the `TMDB_API_KEY` repository secret to run in full. " +
-    "Without it the endpoints are still proven alive and enforcing auth, " +
+    "> **Skipped checks** need the `TMDB_API_KEY` and `DDD_API_KEY` repository secrets " +
+    "to run in full. Without them the endpoints are still proven alive and enforcing auth, " +
     "only the response shapes go unverified.",
     ""
   );

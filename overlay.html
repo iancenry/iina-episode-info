@@ -196,6 +196,49 @@
     #skip-btn { animation:none; transition:none; }
     #skip-btn:hover { transform:none; }
   }
+
+  /* ── Scene cue card ─────────────────────────────────────────
+     A brief heads-up ahead of a timestamped scene, not a skip button held
+     up through the whole scene: main.js takes it down when the scene
+     starts, and it reduces while it waits so it stops competing with the
+     video. Sits above the skip pill so the two never stack. */
+  #cue-wrap {
+    position:fixed; right:4vw; bottom:26vh;
+    display:none;              /* shown by showCue */
+    pointer-events:none;       /* only the button itself is clickable */
+  }
+  #cue-btn {
+    pointer-events:auto;
+    display:flex; align-items:center; gap:9px;
+    background:rgba(18,18,20,0.86);
+    border:1px solid rgba(255,255,255,0.22);
+    border-radius:10px;
+    padding:12px 20px;
+    color:#fff; font-size:15px; font-weight:600;
+    font-family:inherit; cursor:pointer;
+    box-shadow:0 6px 26px rgba(0,0,0,0.55);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    transition:background .15s, border-color .15s, transform .15s, opacity .3s;
+    animation:skipIn .22s ease-out;
+  }
+  #cue-btn:hover {
+    background:rgba(32,32,36,0.94);
+    border-color:rgba(255,255,255,0.4);
+  }
+  #cue-btn .ic { font-size:13px; opacity:.85; }
+  #cue-btn > * { pointer-events:none; }
+  #cue-sub {
+    margin-top:5px; text-align:right;
+    font-size:9px; color:rgba(255,255,255,0.45);
+  }
+  #cue-sub a { color:rgba(255,255,255,0.6); }
+  #cue-wrap.reduced #cue-btn { transform:scale(.9); opacity:.7; }
+  @media (prefers-reduced-motion: reduce) {
+    #cue-btn { animation:none; transition:none; }
+    #cue-btn:hover { transform:none; }
+    #cue-wrap.reduced #cue-btn { transform:none; }
+  }
 </style>
 </head>
 <body>
@@ -221,6 +264,17 @@
   <button id="skip-btn" data-clickable>
     <span class="ic">&#9654;&#9654;</span><span id="skip-label">Skip Intro</span>
   </button>
+</div>
+
+<div id="cue-wrap">
+  <!-- Only ever clickable for a cue that carries a safe position; main.js
+       decides that, so a warn-only card never takes the mouse events. -->
+  <button id="cue-btn" data-clickable>
+    <span class="ic" id="cue-ic">&#9888;</span><span id="cue-label">Skip scene</span>
+  </button>
+  <!-- DDD's attribution is contractually required wherever their data
+       appears, and this card is one of those places. -->
+  <div id="cue-sub"><span id="cue-times"></span><span id="cue-hint"></span> &middot; Powered by <a href="https://www.doesthedogdie.com" target="_blank" rel="noopener">DoesTheDogDie.com</a></div>
 </div>
 
 <script>
@@ -397,6 +451,80 @@ iina.onMessage("hideSkip", function() {
   btn.addEventListener("click", fire);
   // Some hit-test paths deliver only the low-level events; the guard above
   // stops click and mouseup both firing.
+  btn.addEventListener("mousedown", function (ev) { ev.stopPropagation(); });
+  btn.addEventListener("mouseup", fire);
+})();
+
+// ── Scene cue card ───────────────────────────────────────────
+// Driven by main.js, which knows the cue window and the mode. This side only
+// paints it, shrinks it after a few seconds, and sends back whatever the
+// current mode's one button means: skip the scene, cancel an upcoming
+// auto-skip, or undo one that just happened.
+var cueReduceTimer = null;
+var cueMode = "skip";
+var CUE_LABELS = {
+  warn: "Heads-up: ",
+  skip: "Skip scene: ",
+  auto: "Auto-skip: ",
+  undo: "Skipped: "
+};
+var CUE_HINTS = { auto: " \u00b7 tap to cancel", undo: " \u00b7 tap to undo" };
+function cueResetTimer() {
+  if (cueReduceTimer) { clearTimeout(cueReduceTimer); cueReduceTimer = null; }
+}
+iina.onMessage("showCue", function(d) {
+  var mode = (d && CUE_LABELS[d.mode]) ? d.mode : "skip";
+  cueMode = mode;
+  var label = (d && d.label) ? d.label : "sensitive scene";
+  // A pen for the user's own marks, the warning triangle for database data.
+  document.getElementById("cue-ic").textContent = (d && d.local) ? "\u270E" : "\u26A0";
+  document.getElementById("cue-label").textContent = CUE_LABELS[mode] + label;
+  document.getElementById("cue-times").textContent =
+    (d && d.at ? d.at : "") + (d && d.to ? " \u2192 " + d.to : "");
+  document.getElementById("cue-hint").textContent = CUE_HINTS[mode] || "";
+  var wrap = document.getElementById("cue-wrap");
+  var btn  = document.getElementById("cue-btn");
+  wrap.className = "";           // un-reduce, if a previous cue left it
+  wrap.style.display = "block";
+  // Replay the entry animation on each appearance, like the skip pill.
+  btn.style.animation = "none";
+  void btn.offsetWidth;
+  btn.style.animation = "";
+  cueResetTimer();
+  cueReduceTimer = setTimeout(function() {
+    cueReduceTimer = null;
+    wrap.className = "reduced";
+  }, 8000);
+});
+iina.onMessage("hideCue", function() {
+  cueResetTimer();
+  document.getElementById("cue-wrap").style.display = "none";
+});
+// The same click guard as the skip pill: click and mouseup must not both
+// send, and a swallowed click has to be visible on the label. A warn-only
+// card is never made clickable by main.js, so the guard here is belt and
+// braces.
+(function () {
+  var btn = document.getElementById("cue-btn");
+  if (!btn) return;
+  var sent = false;
+  function fire(ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    if (cueMode === "warn" || sent) return;
+    sent = true;
+    setTimeout(function () { sent = false; }, 800);
+    var lab = document.getElementById("cue-label");
+    if (lab) {
+      lab.textContent = cueMode === "auto" ? "Keeping\u2026"
+                      : (cueMode === "undo" ? "Undoing\u2026" : "Skipping\u2026");
+    }
+    var msg = cueMode === "auto" ? "cancelScene"
+            : (cueMode === "undo" ? "undoScene" : "skipScene");
+    try { iina.postMessage(msg, {}); } catch (e) {
+      if (lab) lab.textContent = "postMessage failed";
+    }
+  }
+  btn.addEventListener("click", fire);
   btn.addEventListener("mousedown", function (ev) { ev.stopPropagation(); });
   btn.addEventListener("mouseup", fire);
 })();

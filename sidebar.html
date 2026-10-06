@@ -183,6 +183,61 @@
     color: rgba(255,255,255,.25); font-family: inherit; line-height: 1; }
   .rc-b:hover { color: rgba(255,255,255,.7); }
   .rc-b.pinned { color: #e5b400; }
+  /* Scene warning rows from DoesTheDogDie: one line per timestamped scene,
+     with the cue text under it when the data carries one. */
+  .ddd-row {
+    display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+    font-size:11px; color:rgba(255,255,255,.7);
+    padding:5px 0; border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .ddd-row:last-child { border-bottom:none; }
+  .ddd-lbl { min-width:0; }
+  .ddd-time { color:rgba(255,255,255,.45); white-space:nowrap; }
+  .ddd-cue { font-size:10px; color:rgba(255,255,255,.35); line-height:1.4; margin:-3px 0 4px;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  /* DDD's attribution, shown beside the scene list it belongs to. */
+  .ddd-src { font-size:10px; color:rgba(255,255,255,.3); margin-top:8px; }
+  .ddd-src a { color:rgba(255,255,255,.45); }
+  /* Supercategory headings inside the "also flagged" list. Each group is a
+     details element so the list reads as an overview until expanded. */
+  .ddd-super { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:rgba(255,255,255,.3); margin:8px 0 2px; }
+  .ddd-fgrp { margin:0; }
+  .ddd-fgrp > summary.ddd-super { cursor:pointer; list-style:none; display:flex;
+    align-items:center; gap:5px; user-select:none; }
+  .ddd-fgrp > summary.ddd-super::-webkit-details-marker { display:none; }
+  .ddd-fgrp > summary.ddd-super::before { content:"\25B6"; font-size:7px;
+    color:rgba(255,255,255,.4); display:inline-block; transition:transform .15s; }
+  .ddd-fgrp[open] > summary.ddd-super::before { transform:rotate(90deg); }
+  .ddd-fgrp > summary.ddd-super:hover { color:rgba(255,255,255,.55); }
+  .ddd-gcount { margin-left:auto; color:rgba(255,255,255,.35); font-weight:600; }
+  /* Per-category action pills: one tap cycles Off -> Warn -> Skip -> Auto. */
+  .cpill { font-size:10px; padding:4px 8px; }
+  .cpill.off  { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.11); color:rgba(255,255,255,.45); }
+  .cpill.warn { background:rgba(255,159,10,.14); border-color:rgba(255,159,10,.45); color:#ffd60a; }
+  .cpill.skip { background:rgba(229,9,20,.18); border-color:rgba(229,9,20,.5); color:#fff; }
+  .cpill.auto { background:rgba(48,209,88,.16); border-color:rgba(48,209,88,.5); color:#fff; }
+  /* User-made scene marks. */
+  .mark-btn { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16);
+    color:rgba(255,255,255,.75); font-size:10px; font-weight:600; padding:3px 8px;
+    border-radius:4px; cursor:pointer; font-family:inherit; }
+  .mark-btn:hover { background:rgba(229,9,20,.2); border-color:rgba(229,9,20,.45); color:#fff; }
+  .mark-x { background:none; border:none; color:rgba(255,255,255,.25); cursor:pointer;
+    font-family:inherit; font-size:11px; padding:0 2px; flex-shrink:0; }
+  .mark-x:hover { color:#fff; }
+  /* The mark's type at a glance, and the editor's type selector. */
+  .mark-tag { font-size:9px; letter-spacing:.05em; text-transform:uppercase;
+    color:rgba(255,255,255,.3); flex-shrink:0; }
+  .mark-type.on { background:rgba(229,9,20,.2); border-color:rgba(229,9,20,.45); color:#fff; }
+  /* The inline mark editor: start/end fields, playhead capture, previews. */
+  .mark-edit { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09);
+    border-radius:6px; padding:7px 8px; margin:2px 0 6px; }
+  .mark-edit-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; flex-wrap:wrap; }
+  .mark-edit-row:last-child { margin-bottom:0; }
+  .mark-edit-lbl { font-size:10px; color:rgba(255,255,255,.45); width:32px; flex-shrink:0; }
+  .mark-edit input { flex:1; min-width:0; background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14); border-radius:5px; padding:3px 6px;
+    color:#fff; font-size:11px; font-family:inherit; outline:none; }
   summary.sub-hd { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px;
     padding: 5px 0; margin-bottom: 0; user-select: none; transition: color .15s; }
   summary.sub-hd::-webkit-details-marker { display: none; }
@@ -248,30 +303,34 @@
   <button onclick="doChangeKey()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:11px;cursor:pointer;padding:0">Change</button>
 </div>
 
-<!-- Search -->
-<div class="row">
-  <input id="q" type="text" placeholder="Show or movie name…"
-         onkeydown="if(event.key==='Enter'&&!this.disabled) doSearch()" />
-  <button id="go" onclick="doSearch()">GO</button>
-</div>
+<details class="sub-sec" data-k="find" open>
+  <summary class="sub-hd">Find &amp; Recent</summary>
 
-<div id="panel"><div class="msg">Search above to find a show or movie.</div></div>
-
-<!-- Recent searches, so nothing has to be retyped to get back to a show -->
-<div id="searches-sec" style="display:none;margin-top:8px">
-  <div class="sl" style="margin-bottom:5px">Recent Searches</div>
-  <div id="searches-list" style="display:flex;flex-wrap:wrap;gap:5px"></div>
-</div>
-
-<!-- Recent picks, to reuse a show without searching TMDB again -->
-<div id="recents-sec" style="display:none">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px">
-    <div class="sl" style="margin:0">Recent Picks</div>
-    <button id="rc-clear" onclick="clearRecents()"
-      style="background:none;border:none;color:rgba(255,255,255,.3);font-size:10px;cursor:pointer;padding:0;font-family:inherit">Clear all</button>
+  <!-- Search -->
+  <div class="row">
+    <input id="q" type="text" placeholder="Show or movie name…"
+           onkeydown="if(event.key==='Enter'&&!this.disabled) doSearch()" />
+    <button id="go" onclick="doSearch()">GO</button>
   </div>
-  <div id="recents-list"></div>
-</div>
+
+  <div id="panel"><div class="msg">Search above to find a show or movie.</div></div>
+
+  <!-- Recent searches, so nothing has to be retyped to get back to a show -->
+  <div id="searches-sec" style="display:none;margin-top:8px">
+    <div class="sl" style="margin-bottom:5px">Recent Searches</div>
+    <div id="searches-list" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+  </div>
+
+  <!-- Recent picks, to reuse a show without searching TMDB again -->
+  <div id="recents-sec" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px">
+      <div class="sl" style="margin:0">Recent Picks</div>
+      <button id="rc-clear" onclick="clearRecents()"
+        style="background:none;border:none;color:rgba(255,255,255,.3);font-size:10px;cursor:pointer;padding:0;font-family:inherit">Clear all</button>
+    </div>
+    <div id="recents-list"></div>
+  </div>
+</details>
 
   <details class="sub-sec" data-k="sk">
     <summary class="sub-hd">Skip Intro &amp; Credits</summary>
@@ -295,6 +354,98 @@
     <div id="skip-status" style="font-size:11px;color:rgba(255,255,255,.4);line-height:1.45;margin-top:5px;display:none"></div>
   </details>
 
+  <details class="sub-sec" data-k="ddd">
+    <summary class="sub-hd">Scene Content Warnings</summary>
+
+    <!-- Three activities, three panes: act on this episode (Cues), read what
+         else is flagged (Flags), configure (Options). -->
+    <div id="ddd-tabs" class="pills" style="margin-bottom:8px">
+      <button class="pill on" data-t="cues"    onclick="doDddTab('cues')">Cues</button>
+      <button class="pill"    data-t="flags"   onclick="doDddTab('flags')">Flags</button>
+      <button class="pill"    data-t="options" onclick="doDddTab('options')">Options</button>
+    </div>
+
+    <!-- The attribution sits under the tabs so it is on screen whichever
+         pane the data appears in. -->
+    <div class="ddd-src" id="ddd-attr" style="display:none;margin:0 0 8px">
+      Powered by <a href="https://www.doesthedogdie.com" target="_blank" rel="noopener">DoesTheDogDie.com</a>
+    </div>
+
+    <div id="ddd-pane-cues">
+      <button id="ddd-refresh" onclick="doRefreshScenes()"
+        style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.75);font-size:11px;font-weight:600;padding:6px;border-radius:6px;cursor:pointer;font-family:inherit">Search again</button>
+      <div id="ddd-status" style="font-size:11px;color:rgba(255,255,255,.4);line-height:1.45;margin-top:5px;display:none"></div>
+      <div id="ddd-scenes" style="display:none"></div>
+      <div class="sl" style="margin:12px 0 4px;display:flex;align-items:center;justify-content:space-between">
+        <span>Your marks</span>
+        <button id="ddd-marks-clear" onclick="doMarkClearAll()"
+          style="background:none;border:none;color:rgba(255,255,255,.3);font-size:10px;cursor:pointer;padding:0;font-family:inherit;letter-spacing:normal;text-transform:none">Clear all</button>
+      </div>
+      <div id="ddd-marks"></div>
+      <div id="ddd-mark-pending" style="display:none;font-size:10px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 8px;margin:6px 0"></div>
+      <button id="ddd-mark-trigger" class="mark-btn" style="display:none;width:100%;padding:6px;margin-top:4px" onclick="doMarkTrigger()">+ Mark trigger at playhead</button>
+      <button id="ddd-mark-scan" class="mark-btn" style="display:none;width:100%;padding:6px;margin-top:4px" onclick="doScanSubtitles()">Scan subtitles for tags</button>
+    </div>
+
+    <div id="ddd-pane-flags" style="display:none">
+      <div id="ddd-flags-wrap" style="display:none">
+        <div class="sl" style="margin:0 0 2px">Also flagged, no timestamps</div>
+        <div id="ddd-flags"></div>
+      </div>
+      <div id="ddd-flags-empty" style="display:none;font-size:10px;color:rgba(255,255,255,.25)">
+        Nothing flagged without a timestamp for this title.
+      </div>
+    </div>
+
+    <div id="ddd-pane-options" style="display:none">
+      <div style="font-size:10px;color:rgba(255,255,255,.25);margin-bottom:8px">
+        Timestamped warnings (animal harm, nudity&hellip;) from DoesTheDogDie.com &nbsp;·&nbsp; free key &nbsp;·&nbsp; coverage is sparse
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:7px;padding:8px 10px;margin-bottom:8px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#fff">Show scene cues</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">Pills for warnings and skips</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;margin-left:10px;cursor:pointer">
+          <input type="checkbox" id="ddd-toggle" style="opacity:0;width:0;height:0;position:absolute" onchange="doToggleDdd(this.checked)" />
+          <span id="ddd-track" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.2);border-radius:26px;transition:background .2s">
+            <span id="ddd-thumb" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:left .2s"></span>
+          </span>
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:7px;padding:8px 10px;margin-bottom:8px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#fff">Auto-skips show a card</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">Cancel and Undo stay available &nbsp;·&nbsp; off = silent skip</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;margin-left:10px;cursor:pointer">
+          <input type="checkbox" id="ddd-autocard-toggle" style="opacity:0;width:0;height:0;position:absolute" onchange="doToggleDddAutoCard(this.checked)" />
+          <span id="ddd-autocard-track" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.2);border-radius:26px;transition:background .2s">
+            <span id="ddd-autocard-thumb" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:left .2s"></span>
+          </span>
+        </label>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
+        <input type="password" id="ddd-key-input" placeholder="DoesTheDogDie API key&hellip;" onkeydown="if(event.key==='Enter')doSaveDddKey()"
+          style="flex:1;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);border-radius:6px;padding:6px 9px;color:#fff;font-size:12px;font-family:inherit;outline:none">
+        <button onclick="doSaveDddKey()" style="background:#c0392b;border:none;color:#fff;font-size:11px;font-weight:600;padding:6px 13px;border-radius:6px;cursor:pointer">Save</button>
+      </div>
+      <div id="ddd-key-msg" style="font-size:11px;min-height:15px;color:rgba(255,255,255,0.4);margin-bottom:8px"></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <div style="font-size:11px;color:rgba(255,255,255,.5)">Heads-up</div>
+        <input type="number" id="ddd-lead-input" min="5" max="120" step="5" value="30"
+          onchange="doSetDddLead(this.value)"
+          style="width:52px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:4px 6px;color:#fff;font-size:12px;font-family:inherit;outline:none;text-align:center" />
+        <div style="font-size:11px;color:rgba(255,255,255,.45)">sec before</div>
+      </div>
+      <div class="sl" style="margin-bottom:4px">Categories</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.25);margin-bottom:6px">
+        Tap to cycle: Off &rarr; Warn &rarr; Skip &rarr; Auto
+      </div>
+      <div id="ddd-cats" class="pills"></div>
+    </div>
+  </details>
+
 
 <hr class="div" />
 
@@ -302,38 +453,44 @@
 
 
 
-<!-- Overlay appearance, in one box instead of three -->
-<div class="op-wrap">
-  <div class="op-row">
-    <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Shade</div>
-    <input type="range" id="opacity-slider" min="0" max="100" value="72" oninput="doSetOpacity(this.value)" />
-    <span id="opacity-val">72%</span>
-  </div>
-  <div class="op-row" style="margin-top:7px">
-    <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Position</div>
-    <input type="range" id="vpos-slider" min="0" max="100" value="50" oninput="doSetVPos(this.value)" />
-    <span id="vpos-val">Center</span>
-  </div>
-  <div class="op-row" style="margin-top:7px">
-    <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Theme</div>
-    <div id="theme-pills" style="display:flex;gap:4px;flex:1">
-      <button class="thm" data-t="classic" onclick="doSetTheme('classic')">Classic</button>
-      <button class="thm" data-t="compact" onclick="doSetTheme('compact')">Compact</button>
-      <button class="thm" data-t="poster"  onclick="doSetTheme('poster')">Poster</button>
+<!-- Overlay appearance, collapsed: the card itself is the result; these are
+     set once and rarely touched. -->
+<details class="sub-sec" data-k="app">
+  <summary class="sub-hd">Overlay Appearance</summary>
+  <div class="op-wrap" style="margin-bottom:0">
+    <div class="op-row">
+      <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Shade</div>
+      <input type="range" id="opacity-slider" min="0" max="100" value="72" oninput="doSetOpacity(this.value)" />
+      <span id="opacity-val">72%</span>
+    </div>
+    <div class="op-row" style="margin-top:7px">
+      <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Position</div>
+      <input type="range" id="vpos-slider" min="0" max="100" value="50" oninput="doSetVPos(this.value)" />
+      <span id="vpos-val">Center</span>
+    </div>
+    <div class="op-row" style="margin-top:7px">
+      <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Theme</div>
+      <div id="theme-pills" style="display:flex;gap:4px;flex:1">
+        <button class="thm" data-t="classic" onclick="doSetTheme('classic')">Classic</button>
+        <button class="thm" data-t="compact" onclick="doSetTheme('compact')">Compact</button>
+        <button class="thm" data-t="poster"  onclick="doSetTheme('poster')">Poster</button>
+      </div>
+    </div>
+    <div class="op-row" style="margin-top:7px">
+      <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Delay</div>
+      <div style="flex:1"></div>
+      <input type="number" id="pause-delay-input" min="0.5" max="30" step="0.5" value="3"
+        onchange="doSetPauseDelay(this.value)"
+        style="width:52px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:4px 6px;color:#fff;font-size:12px;font-family:inherit;outline:none;text-align:center" />
+      <span style="font-size:11px;color:rgba(255,255,255,.45)">sec</span>
     </div>
   </div>
-  <div class="op-row" style="margin-top:7px">
-    <div class="sl" style="margin:0;flex:0 0 62px;white-space:nowrap">Delay</div>
-    <div style="flex:1"></div>
-    <input type="number" id="pause-delay-input" min="0.5" max="30" step="0.5" value="3"
-      onchange="doSetPauseDelay(this.value)"
-      style="width:52px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:4px 6px;color:#fff;font-size:12px;font-family:inherit;outline:none;text-align:center" />
-    <span style="font-size:11px;color:rgba(255,255,255,.45)">sec</span>
-  </div>
-</div>
+</details>
 
 <!-- TMDB's required notice, shown where their data is displayed. The full
-     wording is reproduced in the README; this is the short form. -->
+     wording is reproduced in the README; this is the short form. DDD's notice
+     sits with the scene list it belongs to rather than here, because its data
+     only appears when the feature is on. -->
 <div class="attr">
   Data from <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.
   Not endorsed or certified by TMDB.
@@ -350,6 +507,7 @@
 <script src="sidebar/search.js"></script>
 <script src="sidebar/picker.js"></script>
 <script src="sidebar/settings.js"></script>
+<script src="sidebar/marks.js"></script>
 <script src="sidebar/recents.js"></script>
 <script src="sidebar/boot.js"></script>
 </body>

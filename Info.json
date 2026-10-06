@@ -12,7 +12,8 @@
   "description": "Auto-detected episode/movie info overlay on pause. TMDB only.",
   "permissions": [
     "video-overlay",
-    "network-request"
+    "network-request",
+    "file-system"
   ],
   "allowedDomains": [
     "api.themoviedb.org",
@@ -21,7 +22,8 @@
     "api.theintrodb.org",
     "api.skipdb.tv",
     "arm.haglund.dev",
-    "api.aniskip.com"
+    "api.aniskip.com",
+    "www.doesthedogdie.com"
   ],
   "sidebarTab": {
     "name": "Sidekick"

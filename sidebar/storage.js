@@ -139,6 +139,53 @@ function doClear() {
   descExpanded = false;
   episodeCache = [];
   showTotals   = null;
+  iina.postMessage("setSceneMarks", { marks: [] });
   iina.postMessage("clearEpisode", {});
+  if (typeof paintMarks === "function") paintMarks();
   resetPanel();
+}
+
+// ── Local scene marks ─────────────────────────────────────────
+// The user's own trigger/skip-to pairs, for titles the databases have not
+// timed (X2's Mystique scenes, for instance). Keyed like a DDD rating —
+// tmdbId:season:episode, with a film's indexes at -1 — so they attach to the
+// same identification the rest of the plugin uses. Kept indefinitely: a mark
+// is manual work, not a cache.
+function markKey(info) {
+  if (!info || !info.tmdbId) return "";
+  var s = info.isMovie ? -1 : Number(info.season);
+  var e = info.isMovie ? -1 : Number(info.episode);
+  return String(info.tmdbId) + ":" + s + ":" + e;
+}
+
+function loadMarks() {
+  try {
+    var m = JSON.parse(localStorage.getItem("epinfo_marks") || "{}");
+    return (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
+  } catch (e) { return {}; }
+}
+
+function saveMarks(m) {
+  try { localStorage.setItem("epinfo_marks", JSON.stringify(m)); } catch (e) {}
+}
+
+function marksFor(info) {
+  var list = loadMarks()[markKey(info)];
+  return Array.isArray(list) ? list : [];
+}
+
+function setMarksFor(info, list) {
+  var k = markKey(info);
+  if (!k) return;
+  var m = loadMarks();
+  if (list && list.length) m[k] = list;
+  else delete m[k];
+  saveMarks(m);
+}
+
+// The identification the marks UI attaches to: whatever the saved-card
+// selection is, or null when nothing is identified.
+function currentMarkInfo() {
+  try { return JSON.parse(localStorage.getItem("epinfo_ep") || "null"); }
+  catch (e) { return null; }
 }

@@ -260,7 +260,11 @@ function saveSelection(info) {
   saveCurrentUrlInfo(info); // remember per-URL
   pushRecent(info);         // and to the recent picks list
   showSaved(info);
+  // The marks for this identification travel ahead of the selection, so the
+  // cue pipeline has them by the time it resolves.
+  iina.postMessage("setSceneMarks", { marks: marksFor(info) });
   iina.postMessage("episodeSelected", info);
+  if (typeof paintMarks === "function") paintMarks();
   document.getElementById("panel").innerHTML =
     '<div class="ok" style="padding:8px 0">✓ Saved</div>';
   selShow      = null;

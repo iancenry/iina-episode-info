@@ -23,6 +23,22 @@
     paintSkipToggle(sk);
     iina.postMessage("setSkipEnabled", { enabled: sk });
 
+    // Scene warnings: the second key and the second opt-in, also off by
+    // default. Pushed after the skip pair so the two features are set up in
+    // the same order the sidebar shows them.
+    iina.postMessage("setDddKey", { key: localStorage.getItem("epinfo_ddd_key") || "" });
+    var dw = localStorage.getItem("epinfo_ddd_enabled") === "true";
+    paintDddToggle(dw);
+    iina.postMessage("setDddEnabled", { enabled: dw });
+
+    // How early the scene card appears, and the per-category actions.
+    var dl = localStorage.getItem("epinfo_ddd_lead");
+    iina.postMessage("setDddLead", { value: dl !== null ? parseFloat(dl) : 30 });
+    iina.postMessage("setDddCatActions", { actions: loadDddCats() });
+
+    // Whether an auto-skip shows its cancel/undo card. It skips either way.
+    iina.postMessage("setDddAutoCard", { enabled: dddAutoCardOn() });
+
     renderSearches();
     pruneRecents();
     renderRecents();

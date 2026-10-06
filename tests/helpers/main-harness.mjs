@@ -148,7 +148,10 @@ export function loadMain(opts = {}) {
       getChapters() { return opts.chapters || []; },
       seekTo(sec) { sink.seeks.push(sec); },
       osd() {},
-      getPassword() { return Promise.resolve(""); }
+      getPassword() { return Promise.resolve(""); },
+      // The subtitle scanner reads core.subtitle.tracks and .delay, and the
+      // file text arrives through iina.file.read (see `file` below).
+      subtitle: Object.assign({ tracks: [], delay: 0 }, opts.subtitle || {})
     },
     // Read through a thunk rather than capturing the value, so a test can flip
     // the gate after the proxy has been built.
@@ -174,7 +177,7 @@ export function loadMain(opts = {}) {
       buildMenu() {}
     },
     utils: { exec() { return Promise.resolve(""); }, ask() { return Promise.resolve(""); } },
-    file: {}
+    file: opts.file || {}
   };
 
   const timers = [];
