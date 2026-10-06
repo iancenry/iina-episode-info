@@ -126,7 +126,7 @@ The window title, the macOS media panel and IINA's playlist read mpv's
 Three permissions: `video-overlay`, `network-request`, and `file-system`, the
 last so the opt-in scene scan can read the external subtitle you have loaded.
 No analytics, no tracking, no telemetry. `Info.json` declares exactly the hosts
-below and nothing else, and CI fails the build if the code ever calls a host
+below and nothing else, and the test suite fails if the code ever calls a host
 outside that list, from script code or from markup.
 
 With nothing opted in, only TMDB is contacted. Skip intro adds five further
@@ -232,7 +232,7 @@ This plugin contacts:
   on with its own key
 
 No analytics, no tracking, no telemetry. `Info.json` declares exactly these
-hosts and nothing else, and CI fails the build if the code ever calls a host
+hosts and nothing else, and the test suite fails if the code ever calls a host
 outside that list. Comments are stripped first, so naming a host in prose does
 not count as calling it. Covered: URLs in scripts, in `src`, `action`,
 `srcset`, `data`, `poster` and `link href`, plus CSS `@import` and
@@ -258,10 +258,10 @@ anything. It is the reason a release group called "One Pace" still finds One
 Piece, and the reason `IMG_1234.MOV` is left alone instead of being read as
 episode 1234 of a show called IMG.
 
-`check-apis.mjs` runs daily in CI, probing each endpoint and opening (then
-auto-closing) an issue if one breaks. Add `TMDB_API_KEY` and `DDD_API_KEY` to
-`.env` to verify response shapes as well; without them the endpoints are still
-proven alive and enforcing auth.
+`check-apis.mjs` probes each endpoint and reports pass/warn/fail; run it when
+an upstream API changes or before a release. Add `TMDB_API_KEY` and
+`DDD_API_KEY` to `.env` to verify response shapes as well; without them the
+endpoints are still proven alive and enforcing auth.
 
 ## Attribution
 

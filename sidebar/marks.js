@@ -177,11 +177,6 @@ function doPreviewStart(i) {
   if (list[i]) previewAt(Number(list[i].start) - 5);
 }
 
-function doPreviewLanding(i) {
-  var list = marksFor(currentMarkInfo());
-  if (list[i] && list[i].safe != null) previewAt(Number(list[i].safe) - 5);
-}
-
 function doPreviewEditStart() {
   if (markEdit) markEditPullFromDom();
   if (markEdit) previewAt(markEdit.start - 5);

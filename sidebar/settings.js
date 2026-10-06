@@ -389,20 +389,17 @@ function dddFlagOpen(name) {
 // The topics the community has flagged yes on for this title that carry no
 // timestamp, grouped under their supercategory as collapsible sections.
 // Sorted by the plugin, so the rows arrive in group order already.
-var dddFlagsCache = [];
 function renderDddFlags(list) {
   var wrap = document.getElementById("ddd-flags-wrap");
   var el = document.getElementById("ddd-flags");
   var empty = document.getElementById("ddd-flags-empty");
   if (!el || !wrap) return;
   if (!list || !list.length) {
-    dddFlagsCache = [];
     wrap.style.display = "none";
     el.innerHTML = "";
     if (empty) empty.style.display = "block";
     return;
   }
-  dddFlagsCache = list;
   if (empty) empty.style.display = "none";
 
   // Group counts first, so each summary can show its weight.
@@ -472,7 +469,9 @@ var DDD_STATE_LABEL = { off: "Off", warn: "Warn", skip: "Skip", auto: "Auto" };
 function loadDddCats() {
   try {
     var m = JSON.parse(localStorage.getItem("epinfo_ddd_cats") || "{}");
-    return (m && typeof m === "object") ? m : {};
+    // Arrays pass typeof "object" and then get rewritten as sparse index
+    // arrays by the cycling code, so the shape is checked like its siblings.
+    return (m && typeof m === "object" && !Array.isArray(m)) ? m : {};
   } catch (e) { return {}; }
 }
 
