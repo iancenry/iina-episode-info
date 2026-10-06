@@ -166,8 +166,12 @@ auto-updates.
 ### One-off from a local folder
 
 ```sh
-iina-plugin pack /path/to/this/repo     # produces a .iinaplgz
+./scripts/pack.sh     # stages the shipped files, packs, and verifies the archive
 ```
+
+The script exists because packing the repository root directly is wrong:
+`iina-plugin` zips the folder as it is on disk, so a direct pack would bundle
+`.git`, `todo/`, local notes and a local `.env` into the archive.
 
 Then double-click the `.iinaplgz`. Useful for moving the plugin to another Mac
 without publishing, but it will not self-update.
